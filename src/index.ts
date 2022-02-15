@@ -159,7 +159,7 @@ async function processTweet(tweet) {
 
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { return; })
             if (mres != "none") {
-                tags.push({ name: "mmID", value: mres })
+                tags.push({ name: "mmID", value: `${mres}` })
             }
 
             // clean up manifest and ID file.
