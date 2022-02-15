@@ -86,7 +86,7 @@ async function processTweet(tweet) {
             { name: "Key-Word-List", value: "ukraine1" }
         ];
         if (tweet.in_reply_to_status_id) {
-            tags.push({ name: "irtID", value: `${tweet.in_reply_to_status_id}` })
+            tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id}` })
         }
 
         /**
