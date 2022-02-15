@@ -1,38 +1,20 @@
 import Twitter from "node-tweet-stream";
-// import cluster from "cluster";
-
 import Bundlr from "@bundlr-network/client"
-//import { readFileSync } from "fs"
 import tmp from "tmp-promise"
-// import { simplePageArchiver } from "../injectable-archiver/src/lib/simple"
 import * as p from "path"
 import { mkdir, unlink } from "fs/promises";
 import { PathLike, promises, readFileSync } from "fs";
 import { createWriteStream } from "fs";
 import axios from "axios"
 
-// import scrape from 'website-scraper';
-// import PuppeteerPlugin from 'website-scraper-puppeteer';
-
-
 import { getPage, navigatePageSimple } from './lib/puppeteer-setup';
 import { archivePagePass0, ExternalPageResource } from './lib/pass0';
 import puppeteer from 'puppeteer-core';
-import { JSDOM } from 'jsdom';
+import jsdom, { JSDOM } from 'jsdom';
 import { writeFileSync } from 'fs';
 import { extname } from 'path';
 import mime from "mime-types"
 
-// import scrape from "website-scraper";
-// import PuppeteerPlugin from "website-scraper-puppeteer"
-// const scrape = await import("website-scraper");
-// let scrape;
-// let PuppeteerPlugin;
-
-// (async function () {
-//     scrape = await import("../node_modules/website-scraper")
-//     PuppeteerPlugin = await import("../node_modules/website-scraper-puppeteer")
-// })()
 
 function makeDataUri(buffer: Buffer, contentType: string) {
     return `data:${contentType.replace(' ', '')};base64,${buffer.toString('base64')}`
@@ -52,55 +34,72 @@ interface RetreivedResourceError {
 type RetrievedResource = RetrievedResourceOk | RetreivedResourceError
 
 
-let TPM = 0;
+let TPS = 0;
 setInterval(() => {
-    console.log(`TPS: ${TPM}`); TPM = 0
+    console.log(`TPS: ${TPS}`); TPS = 0
 }, 1000)
 
 const checkPath = async (path: PathLike): Promise<boolean> => { return promises.stat(path).then(_ => true).catch(_ => false) }
 
+let twitter
+let bundlr
+
+
 async function main() {
     const keys = JSON.parse(readFileSync("wallet.json").toString());
 
-    const t = new Twitter({
+    twitter = new Twitter({
         consumer_key: keys.tkeys.consumer_key,
         consumer_secret: keys.tkeys.consumer_secret,
         token: keys.tkeys.token,
         token_secret: keys.tkeys.token_secret,
         tweet_mode: "extended"
     })
+    bundlr = new Bundlr("https://devnet.bundlr.network", "arweave", keys.arweave)
 
+    console.log(`Loaded with account address: ${bundlr.address}`)
 
-    const bundlr = new Bundlr("https://devnet.bundlr.network", "arweave", keys.arweave)
-    console.log(bundlr.address)
+    twitter.on('tweet', processTweet)
 
-    t.on('tweet', async (tweet) => {
-        try {
+    twitter.on('error', (e) => {
+        console.error(`tStream error: ${e}`)
+    })
+    const trackKeyWords = ['Ukraine', 'ukraine', 'Russia', 'russia', "#UkraineInvasion"] //ukraine1
+    console.log(`Tracking key words: ${trackKeyWords}`);
+    twitter.track(trackKeyWords)
+}
 
-            TPM++
-            let tmpdir;
-            if (tweet.retweeted_status) { //retweet, ignore.
-                return;
-            }
-            const tags = [
-                { name: "Application", value: "TwittAR" },
-                { name: "tID", value: `${tweet.id}` },
-                { name: "aID", value: `${tweet.user.id}` },
-                { name: "Content-Type", value: "application/json" }
-            ];
-            if (tweet.in_reply_to_status_id) {
-                tags.push({ name: "irtID", value: `${tweet.in_reply_to_status_id}` })
-            }
+async function processTweet(tweet) {
+    let tmpdir;
+    try {
 
-            /**
-             * Application: twittAR
-             * aID: author ID: int
-             * tID: tweet ID: int
-             * mmID: media manifest ID: int
-             */
+        TPS++
 
-            // create media manifest
-            if (tweet.entities.media?.length > 0) {
+        if (tweet.retweeted_status) { //retweet, ignore.
+            return;
+        }
+        const tags = [
+            { name: "Application", value: "TwittAR" },
+            { name: "tID", value: `${tweet.id}` },
+            { name: "aID", value: `${tweet.user.id}` },
+            { name: "Content-Type", value: "application/json" },
+            { name: "kws", value: "ukraine1" }
+        ];
+        if (tweet.in_reply_to_status_id) {
+            tags.push({ name: "irtID", value: `${tweet.in_reply_to_status_id}` })
+        }
+
+        /**
+         * Application: twittAR
+         * aID: author ID: int
+         * tID: tweet ID: int
+         * mmID: media manifest ID: int
+         * kws: keyword set : string
+         */
+
+        // create media manifest
+        if (tweet.entities.media?.length > 0) {
+            try {
                 if (!tmpdir) {
                     tmpdir = await tmp.dir({ unsafeCleanup: true })
                 }
@@ -121,10 +120,14 @@ async function main() {
                         wstream.on('error', reject)
                     })
                 })
-
+            } catch (e) {
+                console.error(`while archiving media: ${e}`)
             }
 
-            if (tweet.entities.urls?.length > 0) {
+        }
+
+        if (tweet.entities.urls?.length > 0) {
+            try {
                 for (let i = 0; i < tweet.entities.urls.length; i++) {
                     const u = tweet.entities.urls[i]
                     const url = u.expanded_url
@@ -145,57 +148,47 @@ async function main() {
                         await pageArchiver(url, sitePath);
                     }
                 }
-
-            }
-            if (tmpdir) {
-                // upload dir
-
-                const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false)
-                if (mres != "none") {
-                    tags.push({ name: "mmID", value: mres })
-                }
-
-                // clean up manifest and ID file.
-                const mpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-manifest.json`)
-                if (await checkPath(mpath)) {
-                    await unlink(mpath);
-                }
-                const idpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-id.txt`)
-                if (await checkPath(idpath)) {
-                    await unlink(idpath);
-                }
-
-                await tmpdir.cleanup()
+            } catch (e) {
+                console.error(`While processing URLs: ${e}`)
             }
 
-            //console.log('tweet received', tweet)
-
-            const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
-            await tx.sign();
-            await tx.upload()
-
-            //console.log(`${tweet.id}:${res.data.id}`)
-            // upload linked entities first: 
-            // if (tweet.entities.urls.length > 0) {
-            //     console.log(tweet.entities.urls)
-            // }
-        } catch (e) {
-            console.log(e)
         }
-    })
+        // if the tweet had some attachments, upload the tmp folder containing said media/site snapshots.
+        if (tmpdir) {
+            // upload dir
 
-    t.on('error', (_) => {
-        console.log('Oh no')
-    })
+            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false)
+            if (mres != "none") {
+                tags.push({ name: "mmID", value: mres })
+            }
 
+            // clean up manifest and ID file.
+            const mpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-manifest.json`)
+            if (await checkPath(mpath)) {
+                await unlink(mpath);
+            }
+            const idpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-id.txt`)
+            if (await checkPath(idpath)) {
+                await unlink(idpath);
+            }
 
+            await tmpdir.cleanup()
+        }
 
-    t.track('Ukraine')
-    t.track('ukraine')
-    t.track('Russia')
-    t.track('russia')
-    t.track("#UkraineInvasion")
+        const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
+        await tx.sign();
+        await tx.upload()
+
+    } catch (e) {
+        console.log(e)
+        if (tmpdir) {
+            await tmpdir.cleanup()
+        }
+    }
 }
+
+
+
 
 
 async function retreiveResources(page: puppeteer.Page, resources: ExternalPageResource[]) {
@@ -261,7 +254,8 @@ async function pageArchiver(url, outFolder) {
 
             // writeFileSync(`${outFolder}/original.html`, `${pass0.docType}\n${pass0.html}`);
 
-            const dom = new JSDOM(`${pass0.docType}\n${pass0.html}`);
+            const virtualConsole = new jsdom.VirtualConsole();
+            const dom = new JSDOM(`${pass0.docType}\n${pass0.html}`, { virtualConsole });
 
             retrievedResources.forEach(resource => {
 
@@ -293,7 +287,11 @@ async function pageArchiver(url, outFolder) {
                     if (resource.type === 'external_css_sheet') {
                         const inlinedStyle = dom.window.document.createElement("style")
                         inlinedStyle.innerHTML = resource.buffer.toString();
-                        el.replaceWith(inlinedStyle);
+                        try {
+                            el.replaceWith(inlinedStyle);
+                        } catch (e) {
+                            console.error(`while inserting inline styling - ${e}`)
+                        }
                         //el.setAttribute('href', makeDataUri(resource.buffer, resource.contentType)); 
                     } else {
                         el.setAttribute('src', makeDataUri(resource.buffer, resource.contentType));
