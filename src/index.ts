@@ -15,8 +15,8 @@ import axios from "axios"
 // import PuppeteerPlugin from 'website-scraper-puppeteer';
 
 
-import { getPage, navigatePageSimple } from '../injectable-archiver/src/lib/puppeteer-setup';
-import { archivePagePass0, ExternalPageResource } from '../injectable-archiver/src/lib/pass0';
+import { getPage, navigatePageSimple } from './lib/puppeteer-setup';
+import { archivePagePass0, ExternalPageResource } from './lib/pass0';
 import puppeteer from 'puppeteer-core';
 import { JSDOM } from 'jsdom';
 import { writeFileSync } from 'fs';

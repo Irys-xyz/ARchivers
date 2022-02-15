@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { getPage, navigatePageSimple } from './puppeteer-setup';
 
-import { archivePagePass0, ExternalPageResource, EmbeddedPageResource } from './pass0';
+import { archivePagePass0, ExternalPageResource } from './pass0';
 
 import puppeteer from 'puppeteer-core';
 
@@ -64,7 +64,7 @@ async function scrapeAll(url: string) {
 
   try {
 
-    const response = await navigatePageSimple(page, url, { waitFor: 19000 });
+    await navigatePageSimple(page, url, { waitFor: 19000 });
     await new Promise(res => setTimeout(res, 1000 * 90));
 
     const pass0 = await page.evaluate(archivePagePass0);
