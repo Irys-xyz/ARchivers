@@ -55,7 +55,7 @@ async function main() {
         token_secret: keys.tkeys.token_secret,
         tweet_mode: "extended"
     })
-    bundlr = new Bundlr("https://devnet.bundlr.network", "arweave", keys.arweave)
+    bundlr = new Bundlr("https://node1.bundlr.network", "arweave", keys.arweave)
 
     console.log(`Loaded with account address: ${bundlr.address}`)
 
