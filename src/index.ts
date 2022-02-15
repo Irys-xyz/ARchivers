@@ -80,10 +80,10 @@ async function processTweet(tweet) {
         }
         const tags = [
             { name: "Application", value: "TwittAR" },
-            { name: "Tweet ID", value: `${tweet.id}` },
-            { name: "Author ID", value: `${tweet.user.id}` },
+            { name: "Tweet-ID", value: `${tweet.id}` },
+            { name: "Author-ID", value: `${tweet.user.id}` },
             { name: "Content-Type", value: "application/json" },
-            { name: "Key word list", value: "ukraine1" }
+            { name: "Key-Word-List", value: "ukraine1" }
         ];
         if (tweet.in_reply_to_status_id) {
             tags.push({ name: "irtID", value: `${tweet.in_reply_to_status_id}` })
@@ -91,10 +91,10 @@ async function processTweet(tweet) {
 
         /**
          * Application: twittAR
-         * aID: author ID: int
-         * tID: tweet ID: int
-         * mmID: media manifest ID: int
-         * kws: keyword set : string
+         * Author-ID: author ID: int
+         * Tweet-ID: tweet ID: int
+         * Media-Manifest-ID: media manifest ID: int
+         * Key-Word-List: keyword set : string
          */
 
         // create media manifest
@@ -159,7 +159,7 @@ async function processTweet(tweet) {
 
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { return; })
             if (mres != "none") {
-                tags.push({ name: "Media Manifest ID", value: `${mres}` })
+                tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
             }
 
             // clean up manifest and ID file.
