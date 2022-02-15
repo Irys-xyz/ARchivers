@@ -60,17 +60,18 @@ setInterval(() => {
 const checkPath = async (path: PathLike): Promise<boolean> => { return promises.stat(path).then(_ => true).catch(_ => false) }
 
 async function main() {
+    const keys = JSON.parse(readFileSync("wallet.json").toString());
 
     const t = new Twitter({
-        consumer_key: "",
-        consumer_secret: "",
-        token: "",
-        token_secret: "",
+        consumer_key: keys.tkeys.consumer_key,
+        consumer_secret: keys.tkeys.consumer_secret,
+        token: keys.tkeys.token,
+        token_secret: keys.tkeys.token_secret,
         tweet_mode: "extended"
     })
 
-    const JWK = JSON.parse(readFileSync("wallet.json").toString());
-    const bundlr = new Bundlr("https://devnet.bundlr.network", "arweave", JWK)
+
+    const bundlr = new Bundlr("https://devnet.bundlr.network", "arweave", keys.arweave)
     console.log(bundlr.address)
 
     t.on('tweet', async (tweet) => {
