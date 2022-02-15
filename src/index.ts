@@ -157,7 +157,7 @@ async function processTweet(tweet) {
         if (tmpdir) {
             // upload dir
 
-            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false)
+            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { return; })
             if (mres != "none") {
                 tags.push({ name: "mmID", value: mres })
             }
