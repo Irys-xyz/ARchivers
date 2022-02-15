@@ -62,7 +62,7 @@ async function main() {
     twitter.on('tweet', processTweet)
 
     twitter.on('error', (e) => {
-        console.error(`tStream error: ${e}`)
+        console.error(`tStream error: ${e.stack}`)
     })
     const trackKeyWords = ['Ukraine', 'ukraine', 'Russia', 'russia', "#UkraineInvasion"] //ukraine1
     console.log(`Tracking key words: ${trackKeyWords}`);
@@ -121,7 +121,7 @@ async function processTweet(tweet) {
                     })
                 })
             } catch (e) {
-                console.error(`while archiving media: ${e}`)
+                console.error(`while archiving media: ${e.stack}`)
             }
 
         }
@@ -149,7 +149,7 @@ async function processTweet(tweet) {
                     }
                 }
             } catch (e) {
-                console.error(`While processing URLs: ${e}`)
+                console.error(`While processing URLs: ${e.stack}`)
             }
 
         }
@@ -180,7 +180,7 @@ async function processTweet(tweet) {
         await tx.upload()
 
     } catch (e) {
-        console.log(e)
+        console.log(e.stack)
         if (tmpdir) {
             await tmpdir.cleanup()
         }
