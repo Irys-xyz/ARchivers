@@ -1,28 +1,26 @@
 {
-    "compilerOptions": {
-
-      "skipLibCheck": true,
-      "allowSyntheticDefaultImports": true,
-      "allowJs": true,
-      "declaration": true,
-      "lib": ["es2020","DOM"],
-      "module": "CommonJS",
-      "moduleResolution": "node",
-      "target": "ES2020",
-      "esModuleInterop": true,
-      "alwaysStrict": true,
-      "sourceMap": true,
-      "forceConsistentCasingInFileNames": true,
-      "noFallthroughCasesInSwitch": true,
-      "noImplicitReturns": true,
-      "noUnusedLocals": true,
-      "noUnusedParameters": true,
-      "noImplicitAny": false,
-      "noImplicitThis": false,
-      "strictNullChecks": false,
-      "outDir": "build"
-    },
-    "include": ["src/**/*"],
-    "exclude": ["src/__tests__/**"]
-  }
-  
+  "compilerOptions": {
+    "target": "es2019",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "declaration": true,
+    "lib": ["es2019", "dom"],
+    "esModuleInterop": true,
+    "alwaysStrict": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "strictNullChecks": false,
+    "outDir": "build"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/__tests__/**"]
+}
