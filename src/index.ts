@@ -35,8 +35,9 @@ type RetrievedResource = RetrievedResourceOk | RetreivedResourceError
 
 
 let TPS = 0;
+let pTPS = 0
 setInterval(() => {
-    console.log(`TPS: ${TPS}`); TPS = 0
+    console.log(`TPS: ${TPS} - pTPS: ${pTPS}`); TPS = 0; pTPS = 0
 }, 1000)
 
 const checkPath = async (path: PathLike): Promise<boolean> => { return promises.stat(path).then(_ => true).catch(_ => false) }
@@ -75,12 +76,17 @@ async function main() {
 async function processTweet(tweet) {
     let tmpdir;
     try {
-
+        // if (TPS === 0) {
+        //     console.log(tweet.text)
+        // }
         TPS++
 
         if (tweet.retweeted_status) { //retweet, ignore.
             return;
         }
+
+
+
 
         /**
          * Application: twittAR
@@ -200,6 +206,7 @@ async function processTweet(tweet) {
         const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
         await tx.sign();
         await tx.upload()
+        pTPS++
 
     } catch (e) {
         console.log(e.stack)
