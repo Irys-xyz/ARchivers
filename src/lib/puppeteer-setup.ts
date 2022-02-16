@@ -55,7 +55,7 @@ export async function navigatePageSimple(page: puppeteer.Page, url: string, { wa
   const response = await page.goto(url, {
     timeout: 40000,
     waitUntil: 'networkidle2'
-  });
+  }).catch(_ => { console.log(`navigation to ${url} timed out`) })
   if (response && response.status() < 400) {
     await page.waitForTimeout(waitFor);
     return response;
