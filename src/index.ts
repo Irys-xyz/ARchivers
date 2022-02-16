@@ -69,6 +69,9 @@ async function main() {
     twitter.track(trackKeyWords)
 }
 
+
+
+
 async function processTweet(tweet) {
     let tmpdir;
     try {
@@ -78,6 +81,15 @@ async function processTweet(tweet) {
         if (tweet.retweeted_status) { //retweet, ignore.
             return;
         }
+
+        /**
+         * Application: twittAR
+         * Author-ID: author ID: int
+         * Tweet-ID: tweet ID: int
+         * Media-Manifest-ID: media manifest ID: int
+         * Key-Word-List: keyword set : string
+         */
+
         const tags = [
             { name: "Application", value: "TwittAR" },
             { name: "Tweet-ID", value: `${tweet.id}` },
@@ -89,13 +101,6 @@ async function processTweet(tweet) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id}` })
         }
 
-        /**
-         * Application: twittAR
-         * Author-ID: author ID: int
-         * Tweet-ID: tweet ID: int
-         * Media-Manifest-ID: media manifest ID: int
-         * Key-Word-List: keyword set : string
-         */
 
         // create media manifest
         if (tweet.entities.media?.length > 0) {
@@ -140,16 +145,29 @@ async function processTweet(tweet) {
                     }
                     const headres = await axios.head(url)
                     const contentType = headres.headers["content-type"].split(";")[0].toLowerCase()
+                    const linkPath = p.join(tmpdir.path, `/links/${i}`)
+                    if (!await checkPath(linkPath)) {
+                        await mkdir(linkPath, { recursive: true })
+                    }
+                    // if it links a web page:
                     if (contentType === "text/html") {
-                        const sitePath = p.join(tmpdir.path, `/links/${i}`)
-                        if (!await checkPath(sitePath)) {
-                            await mkdir(sitePath, { recursive: true })
-                        }
-                        await pageArchiver(url, sitePath);
+                        await pageArchiver(url, linkPath);
+                    } else {
+                        const ext = url.split("/").at(-1).split(".")[1]
+                        const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
+                        const res = await axios.get(url, {
+                            responseType: "stream"
+                        })
+                        await res.data.pipe(wstream) // pipe to file
+                        await new Promise((resolve, reject) => {
+                            wstream.on('finish', resolve)
+                            wstream.on('error', reject)
+                        })
+
                     }
                 }
             } catch (e) {
-                console.error(`While processing URLs: ${e.stack}`)
+                console.error(`While processing URLs: ${e.stack ?? e.message}`)
             }
 
         }
@@ -159,7 +177,11 @@ async function processTweet(tweet) {
 
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { return; })
             if (mres != "none") {
-                tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
+                if (!mres) {
+                    console.log(`null media manifest for tweet ID ${tweet.id}`)
+                } else {
+                    tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
+                }
             }
 
             // clean up manifest and ID file.
