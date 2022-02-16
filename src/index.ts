@@ -59,7 +59,7 @@ async function main() {
     bundlr = new Bundlr("https://node1.bundlr.network", "arweave", keys.arweave)
 
     console.log(`Loaded with account address: ${bundlr.address}`)
-
+    //await processTweet(tweet)
     twitter.on('tweet', processTweet)
 
     twitter.on('error', (e) => {
@@ -255,7 +255,7 @@ async function scrapeAll(url: string) {
 
     try {
 
-        await navigatePageSimple(page, url, { waitFor: 0 });
+        await navigatePageSimple(page, url, { waitFor: 10000 });
         // await new Promise(res => setTimeout(res, 1000 * 90));
 
         const pass0 = await page.evaluate(archivePagePass0);

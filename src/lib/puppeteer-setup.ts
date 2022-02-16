@@ -51,7 +51,7 @@ export async function getBrowser() {
   return browser;
 }
 
-export async function navigatePageSimple(page: puppeteer.Page, url: string, { waitFor = 4000 }) {
+export async function navigatePageSimple(page: puppeteer.Page, url: string, { waitFor = 10000 }) {
   const response = await page.goto(url, {
     timeout: 40000,
     waitUntil: 'networkidle2'
