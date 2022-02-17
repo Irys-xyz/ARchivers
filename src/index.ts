@@ -209,7 +209,7 @@ async function processTweet(tweet) {
         pTPS++
 
     } catch (e) {
-        console.log(e.stack)
+        console.log(`general error: ${e.stack ?? e.message}`)
         if (tmpdir) {
             await tmpdir.cleanup()
         }
