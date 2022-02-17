@@ -118,20 +118,20 @@ async function processTweet(tweet) {
                 if (!await checkPath(mediaDir)) {
                     await mkdir(mediaDir)
                 }
-                tweet.entities.media.forEach(async (u, i) => {
-                    const url = u.media_url_https as string
+                for (let i = 0; i < tweet.entities.media.length; i++) {
+                    const url = tweet.entities.media[i].media_url_https as string
                     const ext = url.split("/").at(-1).split(".")[1]
                     const wstream = createWriteStream(p.join(mediaDir, `${i}.${ext}`))
                     const res = await axios.get(url, {
                         responseType: "stream"
                     }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
-                    if (!res) { return; }
+                    if (!res) { continue; }
                     await res.data.pipe(wstream) // pipe to file
                     return new Promise((resolve, reject) => {
                         wstream.on('finish', resolve)
                         wstream.on('error', reject)
                     })
-                })
+                }
             } catch (e) {
                 console.error(`while archiving media: ${e.stack}`)
             }
