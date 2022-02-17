@@ -124,7 +124,8 @@ async function processTweet(tweet) {
                     const wstream = createWriteStream(p.join(mediaDir, `${i}.${ext}`))
                     const res = await axios.get(url, {
                         responseType: "stream"
-                    })
+                    }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
+                    if (!res) { return; }
                     await res.data.pipe(wstream) // pipe to file
                     return new Promise((resolve, reject) => {
                         wstream.on('finish', resolve)
@@ -149,7 +150,8 @@ async function processTweet(tweet) {
                     if (!tmpdir) {
                         tmpdir = await tmp.dir({ unsafeCleanup: true })
                     }
-                    const headres = await axios.head(url)
+                    const headres = await axios.head(url).catch((e) => { console.log(`heading ${url} - ${e.message}`) })
+                    if (!headres) { continue }
                     const contentType = headres.headers["content-type"].split(";")[0].toLowerCase()
                     const linkPath = p.join(tmpdir.path, `/links/${i}`)
                     if (!await checkPath(linkPath)) {
@@ -163,7 +165,8 @@ async function processTweet(tweet) {
                         const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
                         const res = await axios.get(url, {
                             responseType: "stream"
-                        })
+                        }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
+                        if (!res) { continue; }
                         await res.data.pipe(wstream) // pipe to file
                         await new Promise((resolve, reject) => {
                             wstream.on('finish', resolve)
