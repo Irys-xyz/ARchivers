@@ -119,12 +119,14 @@ async function processTweet(tweet) {
                     await mkdir(mediaDir)
                 }
                 for (let i = 0; i < tweet.entities.media.length; i++) {
-                    const url = tweet.entities.media[i].media_url_https as string
+                    const url = tweet.entities.media[i].media_url as string
                     const ext = url.split("/").at(-1).split(".")[1]
                     const wstream = createWriteStream(p.join(mediaDir, `${i}.${ext}`))
                     const res = await axios.get(url, {
                         responseType: "stream"
-                    }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
+                    }).catch((e) => {
+                        console.log(`getting ${url} - ${e.message}`)
+                    })
                     if (!res) { continue; }
                     await res.data.pipe(wstream) // pipe to file
                     await new Promise((resolve, reject) => {
@@ -150,7 +152,9 @@ async function processTweet(tweet) {
                     if (!tmpdir) {
                         tmpdir = await tmp.dir({ unsafeCleanup: true })
                     }
-                    const headres = await axios.head(url).catch((e) => { console.log(`heading ${url} - ${e.message}`) })
+                    const headres = await axios.head(url).catch((e) => {
+                        console.log(`heading ${url} - ${e.message}`)
+                    })
                     if (!headres) { continue }
                     const contentType = headres.headers["content-type"].split(";")[0].toLowerCase()
                     const linkPath = p.join(tmpdir.path, `/links/${i}`)
@@ -165,7 +169,9 @@ async function processTweet(tweet) {
                         const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
                         const res = await axios.get(url, {
                             responseType: "stream"
-                        }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
+                        }).catch((e) => {
+                            console.log(`getting ${url} - ${e.message}`)
+                        })
                         if (!res) { continue; }
                         await res.data.pipe(wstream) // pipe to file
                         await new Promise((resolve, reject) => {
@@ -184,12 +190,13 @@ async function processTweet(tweet) {
         if (tmpdir) {
             // upload dir
 
-            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { return; })
+            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
             if (mres != "none") {
                 if (!mres) {
                     console.log(`null media manifest for tweet str_ID ${tweet.id_str}`)
                 } else {
                     tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
+                    console.log(`https://node1.bundlr.network/tx/${mres}/data`)
                 }
             }
 
