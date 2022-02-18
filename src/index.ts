@@ -127,7 +127,7 @@ async function processTweet(tweet) {
                     }).catch((e) => { console.log(`getting ${url} - ${e.message}`) })
                     if (!res) { continue; }
                     await res.data.pipe(wstream) // pipe to file
-                    return new Promise((resolve, reject) => {
+                    await new Promise((resolve, reject) => {
                         wstream.on('finish', resolve)
                         wstream.on('error', reject)
                     })
