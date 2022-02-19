@@ -112,7 +112,7 @@ async function processTweet(tweet) {
                 }
                 for (let i = 0; i < tweet.entities.media.length; i++) {
                     const url = tweet.entities.media[i].media_url as string
-                    const ext = url.split("/").at(-1).split(".")[1]
+                    const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unknown"
                     const wstream = createWriteStream(p.join(mediaDir, `${i}.${ext}`))
                     const res = await axios.get(url, {
                         responseType: "stream"
@@ -148,7 +148,7 @@ async function processTweet(tweet) {
                         console.log(`heading ${url} - ${e.message}`)
                     })
                     if (!headres) { continue }
-                    const contentType = headres.headers["content-type"].split(";")[0].toLowerCase()
+                    const contentType = headres.headers["content-type"]?.split(";")[0]?.toLowerCase() ?? "text/html"
                     const linkPath = p.join(tmpdir.path, `/links/${i}`)
                     if (!await checkPath(linkPath)) {
                         await mkdir(linkPath, { recursive: true })
@@ -157,7 +157,7 @@ async function processTweet(tweet) {
                     if (contentType === "text/html") {
                         await pageArchiver(url, linkPath);
                     } else {
-                        const ext = url.split("/").at(-1).split(".")[1]
+                        const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unkown"
                         const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
                         const res = await axios.get(url, {
                             responseType: "stream"
