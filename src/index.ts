@@ -76,17 +76,10 @@ async function main() {
 async function processTweet(tweet) {
     let tmpdir;
     try {
-        // if (TPS === 0) {
-        //     console.log(tweet.text)
-        // }
         TPS++
-
         if (tweet.retweeted_status) { //retweet, ignore.
             return;
         }
-
-
-
 
         /**
          * Application: twittAR
@@ -103,12 +96,11 @@ async function processTweet(tweet) {
             { name: "Content-Type", value: "application/json" },
             { name: "Key-Word-List", value: "ukraine1" }
         ];
+
         if (tweet.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id}` })
         }
 
-
-        // create media manifest
         if (tweet.entities.media?.length > 0) {
             try {
                 if (!tmpdir) {
@@ -189,7 +181,6 @@ async function processTweet(tweet) {
         // if the tweet had some attachments, upload the tmp folder containing said media/site snapshots.
         if (tmpdir) {
             // upload dir
-
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
             if (mres != "none") {
                 if (!mres) {
@@ -228,7 +219,7 @@ async function processTweet(tweet) {
 
 
 
-
+// helper functions for page downloading functionality
 
 async function retreiveResources(page: puppeteer.Page, resources: ExternalPageResource[]) {
 

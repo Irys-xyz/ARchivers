@@ -1,0 +1,20 @@
+{
+    "tkeys": {
+        "consumer_key": "",
+        "consumer_secret": "",
+        "token": "",
+        "token_secret": ""
+    },
+    "arweave": {
+        "d": "",
+        "dp": "",
+        "dq": "",
+        "e": "",
+        "ext": true,
+        "kty": "",
+        "n": "",
+        "p": "",
+        "q": "",
+        "qi": ""
+    }
+}
