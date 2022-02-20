@@ -66,8 +66,9 @@ async function main() {
         console.error(`tStream error: ${e.stack}`)
     })
     const trackKeyWords = ['Ukraine', 'ukraine', 'Russia', 'russia', "#UkraineInvasion"] //ukraine1
-    const trackUsers = [718916004072570880, 2315512764] // @konrad_muzyka, @bellingcat
+    const trackUsers = ["718916004072570880", "2315512764"] // @konrad_muzyka, @bellingcat
     console.log(`Tracking key words: ${trackKeyWords}`);
+    console.log(`Tracking users: ${trackUsers}`)
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
 }
