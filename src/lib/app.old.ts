@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { simplePageArchiver } from '../lib/simple';
+import { simplePageArchiver } from './simple';
 
 const app = express();
 
@@ -9,7 +9,7 @@ const PORT = process.env.PORT && parseInt(process.env.PORT) || 1888
 app.use(cors());
 
 app.get('/scrape/*', async (req, res) => {
-  
+
   const url = req.url.substr(8);
   console.log(`Request url: ${req.url} - scraping: ${url}`);
 
@@ -21,7 +21,7 @@ app.get('/scrape/*', async (req, res) => {
     res.status(400).send('Bad Request');
   }
 
-  try { 
+  try {
     const result = await simplePageArchiver(url)
     console.log(`Got result with content-type: ${result.contentType}`)
     res.contentType(result.contentType)
@@ -36,7 +36,7 @@ app.get('/scrape/*', async (req, res) => {
 })
 
 app.get('/preview/*', async (req, res) => {
-  
+
   const url = req.url.substr(9);
   console.log(`Request url: ${req.url} - scraping: ${url}`);
 
@@ -48,19 +48,19 @@ app.get('/preview/*', async (req, res) => {
     res.status(400).send('Bad Request');
   }
 
-  try { 
+  try {
     const result = await simplePageArchiver(url)
     console.log(`Got result with content-type: ${result.contentType}`)
-    
+
     // TODO: This assumes the string is utf-8 encoded. We should 
     // proboably check the result.contentType to see if it is encoded 
     // with something else. no idea how common non utf-8 encoded responses 
     // are.
 
-    const content: Buffer = 
-      typeof result.out === 'string' ? 
+    const content: Buffer =
+      typeof result.out === 'string' ?
         Buffer.from(result.out, 'utf-8')
-          : 
+        :
         result.out;
 
     res.contentType('text/html')
@@ -72,7 +72,7 @@ app.get('/preview/*', async (req, res) => {
     res.status(500).send('Unexpected error');
   }
 
-}) 
+})
 
 app.listen(PORT, () => {
   console.log(`Listening on port: ${PORT}`);

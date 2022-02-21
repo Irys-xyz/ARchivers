@@ -5,6 +5,7 @@
         "token": "",
         "token_secret": ""
     },
+    "newsapi": "",
     "arweave": {
         "d": "",
         "dp": "",

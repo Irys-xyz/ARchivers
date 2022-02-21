@@ -3,3 +3,8 @@ yarn.lock
 wallet.json
 build/
 yarn-error.log
+sites/
+ARchiver.db
+ARchiver.db-shm
+ARchiver.db-wal
+.env
