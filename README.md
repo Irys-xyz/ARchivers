@@ -1,6 +1,6 @@
 # ARchivers - repository for TwittAR and ARticle - Two tools which record tweets and articles - permanently storing them on Arweave via Bundlr
-To run either TwittAR or ARticle, you need an Arweave wallet - more specifically an Arweave walletfile.
-You need to copy the contents of this walletfile into a the example wallet (example.wallet.json) - into the "arweave" section.
+To run either TwittAR or ARticle, you need an Arweave wallet - more specifically an Arweave wallet file.
+You need to copy the contents of this wallet file into the example (example.wallet.json) wallets' "arweave" section.
 
 You also need to have docker and a set of build tools installed (for not LTS node versions).  
 
