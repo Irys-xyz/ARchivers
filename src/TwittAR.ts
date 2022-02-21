@@ -140,6 +140,7 @@ async function processTweet(tweet) {
                         // add to article DB.
                         console.log(`giving ${url} to ARticle`)
                         await article.addUrl(url)
+                        await article.processURL(url) // to effectively prioritise first time downloads
                         // const out = await pageArchiver(url);
                         // await writeFile(`${linkPath}/index.html`, out)
 

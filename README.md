@@ -4,10 +4,12 @@ You need to copy the contents of this walletfile into a the example wallet (exam
 
 You also need to have docker and a set of build tools installed (for not LTS node versions).  
 
-run `yarn` to install dependencies.
+Run `yarn` to install dependencies.
 
-tweak the MAX_CONCURRENT_SESSIONS value in start-headless-chrome.sh as required - higher = more load but a higher %age of content being archived.
-then run start-headless-chrome.sh
+Docker command to create headless chrome host:
+`docker run --shm-size=4096m -e KEEP_ALIVE=true -e MAX_CONCURRENT_SESSIONS=60 -e MAX_QUEUE_LENGTH=400 -e CONNECTION_TIMEOUT=180000 -p 3000:3000 --restart always -d --name bc browserless/chrome`
+
+Tweak the `MAX_CONCURRENT_SESSIONS` value as required - higher = more load but a higher chance of content being archived (download requests are dropped if the queue gets too full).
 
 # TwittAR
 To run TwittAR you need Twitter API keys, which you can get via a Twitter developer account
@@ -20,19 +22,19 @@ Then in the developer portal, request elevated access - this should be approved 
 
 # ARticle
 For ARticle, you need a NewsAPI API key - which you can get at https://newsapi.org  
-Add this to your wallet.json (or example.wallet.json - rename to wallet.json)  
+Add this to your `wallet.json` (or example.wallet.json - rename to wallet.json)  
 (it can be run without as an external import - just don't invoke `updateNewsApi`)
 
-Tweak config.json as required, adding in keyterms - tweak instances to about 50% of your MAX_CONCURRENT_SESSIONS value.  
+Tweak config.json as required, adding in `keyterms` - tweak `instances` to about 50% of your `MAX_CONCURRENT_SESSIONS` value.  
 
-if you are noticing too many re-uploads of unchanged data, or that the system is not responding to changes, change the `difference` value in the config - lower = more sensitive to changes.
+If you are noticing too many re-uploads of unchanged data, or that the system is not responding to changes, change the `difference` value in the config - lower = more sensitive to changes.
 
-### running
+### Running
 
-install PM2 globally:  
-`sudo yarn global add pm2`  
-build the project:  
+Install PM2 globally: (use elevated terminal)   
+`yarn global add pm2`  
+Build the project:  
 `yarn build`  
-start the project:  
+Start the project (TwittAR and ARticle):  
 `pm2 start ARchiver.ecosystem.config.js`  
 
