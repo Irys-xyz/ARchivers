@@ -172,7 +172,7 @@ export default class ARticle {
   async update() {
     const limit = pLimit(this.instances)
     let toProcess = []
-    const urls = this.db("ARticle").select("url").stream();
+    const urls = this.db("ARticle").select("url").orderBy("firstCheck", "asc").stream();
     for await (const { url } of urls) {
       toProcess.push(
         limit(() => this.processURL(url))
