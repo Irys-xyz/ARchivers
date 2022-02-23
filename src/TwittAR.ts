@@ -73,14 +73,15 @@ async function processTweet(tweet) {
 
         const tags = [
             { name: "Application", value: "TwittAR" },
-            { name: "Tweet-ID", value: `${tweet.id}` },
-            { name: "Author-ID", value: `${tweet.user.id}` },
+            { name: "Tweet-ID", value: `${tweet.id_str}` },
+            { name: "Author-ID", value: `${tweet.user.id_str}` },
+            { name: "Author-Name", value: `${tweet.user.name}` },
             { name: "Content-Type", value: "application/json" },
             { name: "Key-Word-List", value: "ukraine2" }
         ];
 
         if (tweet.in_reply_to_status_id) {
-            tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id}` })
+            tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str}` })
         }
 
         if (tweet.entities.media?.length > 0) {
