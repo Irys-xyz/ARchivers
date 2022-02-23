@@ -75,7 +75,7 @@ async function processTweet(tweet) {
             { name: "Application", value: "TwittAR" },
             { name: "Tweet-ID", value: `${tweet.id_str}` },
             { name: "Author-ID", value: `${tweet.user.id_str}` },
-            { name: "Author-Name", value: `${tweet.user.name}` },
+            { name: "Author-Name", value: `${tweet.user.screen_name}` },
             { name: "Content-Type", value: "application/json" },
             { name: "Key-Word-List", value: "ukraine2" }
         ];
