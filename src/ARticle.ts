@@ -96,7 +96,6 @@ export default class ARticle {
 
     // get storage hash ID
     const storeHash = crypto.createHash('sha256').update(url).digest('hex');
-    return;
     console.log(`URL:SH ${url} : ${storeHash}`)
     const storePath = "./sites" // TODO: configurable
     const indexPath = `${storePath}/${storeHash}.html`
@@ -182,7 +181,6 @@ export default class ARticle {
     }
     console.log(`Processing...`)
     await Promise.allSettled(toProcess)
-    console.log(toProcess)
   }
 
 
