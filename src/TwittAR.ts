@@ -8,7 +8,6 @@ import { createWriteStream } from "fs";
 import axios from "axios"
 import ARticle from "./ARticle";
 
-
 let TPS = 0;
 let pTPS = 0
 setInterval(() => {
@@ -50,6 +49,7 @@ async function main() {
     console.log(`Tracking users: ${trackUsers}`)
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
+    // twitter.follow("957688150574469122")
 }
 
 
@@ -81,11 +81,11 @@ async function processTweet(tweet) {
             { name: "Key-Word-List", value: "ukraine2" }
         ];
 
-        if (tweet.in_reply_to_status_id) {
+        if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str}` })
         }
 
-        if (tweet.entities.media?.length > 0) {
+        if (tweet?.extended_entities?.media?.length > 0) {
             try {
                 if (!tmpdir) {
                     tmpdir = await tmp.dir({ unsafeCleanup: true })
@@ -94,21 +94,15 @@ async function processTweet(tweet) {
                 if (!await checkPath(mediaDir)) {
                     await mkdir(mediaDir)
                 }
-                for (let i = 0; i < tweet.entities.media.length; i++) {
-                    const url = tweet.entities.media[i].media_url as string
-                    const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unknown"
-                    const wstream = createWriteStream(p.join(mediaDir, `${i}.${ext}`))
-                    const res = await axios.get(url, {
-                        responseType: "stream"
-                    }).catch((e) => {
-                        console.log(`getting ${url} - ${e.message}`)
-                    })
-                    if (!res) { continue; }
-                    await res.data.pipe(wstream) // pipe to file
-                    await new Promise((resolve, reject) => {
-                        wstream.on('finish', resolve)
-                        wstream.on('error', reject)
-                    })
+                for (let i = 0; i < tweet.extended_entities.media.length; i++) {
+                    const mobj = tweet.extended_entities.media[i]
+                    const url = mobj.media_url
+                    if ((mobj.type === "video" || mobj.type === "animated_gif") && mobj?.video_info?.variants) {
+                        const variants = mobj?.video_info?.variants.sort((a, b) => ((a.bitrate ?? 1000) > (b.bitrate ?? 1000) ? -1 : 1))
+                        await processMediaURL(variants[0].url, mediaDir, i)
+                    } else {
+                        await processMediaURL(url, mediaDir, i)
+                    }
                 }
             } catch (e) {
                 console.error(`while archiving media: ${e.stack}`)
@@ -142,26 +136,8 @@ async function processTweet(tweet) {
                         // add to article DB.
                         console.log(`giving ${url} to ARticle`)
                         await article.addUrl(url)
-                        // await article.processURL(url) // to effectively prioritise first time downloads
-                        // const out = await pageArchiver(url);
-                        // await writeFile(`${linkPath}/index.html`, out)
-
-
                     } else {
-                        const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unknown"
-                        const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
-                        const res = await axios.get(url, {
-                            responseType: "stream"
-                        }).catch((e) => {
-                            console.log(`getting ${url} - ${e.message}`)
-                        })
-                        if (!res) { continue; }
-                        await res.data.pipe(wstream) // pipe to file
-                        await new Promise((resolve, reject) => {
-                            wstream.on('finish', resolve)
-                            wstream.on('error', reject)
-                        })
-
+                        await processMediaURL(url, linkPath, i)
                     }
                 }
             } catch (e) {
@@ -208,4 +184,25 @@ async function processTweet(tweet) {
     }
 }
 
+
+export async function processMediaURL(url: string, dir: string, i: number) {
+    return new Promise(async (resolve, reject) => {
+        const ext = url?.split("/")?.at(-1)?.split(".")?.at(1)?.split("?").at(0) ?? "unknown"
+        const wstream = createWriteStream(p.join(dir, `${i}.${ext}`))
+        const res = await axios.get(url, {
+            responseType: "stream"
+        }).catch((e) => {
+            console.log(`getting ${url} - ${e.message}`)
+        })
+        if (!res) { return }
+        await res.data.pipe(wstream) // pipe to file
+        wstream.on('finish', () => {
+            resolve("done")
+        })
+        wstream.on('error', (e) => {
+            reject(e)
+        })
+    })
+
+}
 main();
