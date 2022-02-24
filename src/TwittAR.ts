@@ -148,7 +148,7 @@ async function processTweet(tweet) {
 
 
                     } else {
-                        const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unkown"
+                        const ext = url?.split("/")?.at(-1)?.split(".")[1] ?? "unknown"
                         const wstream = createWriteStream(p.join(linkPath, `${i}.${ext}`))
                         const res = await axios.get(url, {
                             responseType: "stream"

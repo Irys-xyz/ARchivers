@@ -31,13 +31,15 @@ export default class ARticle {
   protected instances: number;
   private query: string
   private diff: number
+  refreshPeriod: string;
 
 
 
-  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number }) {
+  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string }) {
     this.instances = config.instances;
     this.query = config.query;
     this.diff = config.difference
+    this.refreshPeriod = config.refreshPeriod ?? `-4 hours`
 
     this.db = knex({
       client: "better-sqlite3",
@@ -60,7 +62,6 @@ export default class ARticle {
 
     if (!await this.db.schema.hasTable('ARticle')) {
       console.log("regenerating table")
-      // 2022-02-21 18:25:13
       await this.db.schema.createTable('ARticle', (tbl) => {
         tbl.string("url").primary().unique();
         tbl.date("lastCheck").defaultTo(new Date().toISOString().slice(0, 19).replace('T', ' ')).notNullable()
@@ -81,7 +82,7 @@ export default class ARticle {
  */
   async processURL(url): Promise<any> {
     // check, add if missing, and then get DB entry for URL.
-    const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates"]).where('url', '=', url).whereRaw(`lastCheck < Datetime('now', '-3 minutes', 'localtime')`).first();
+    const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates"]).where('url', '=', url).whereRaw(`lastCheck < Datetime('now', ? , 'localtime')`, [this.refreshPeriod]).first();
 
     if (!entry) { return }
 
@@ -95,6 +96,7 @@ export default class ARticle {
 
     // get storage hash ID
     const storeHash = crypto.createHash('sha256').update(url).digest('hex');
+    return;
     console.log(`URL:SH ${url} : ${storeHash}`)
     const storePath = "./sites" // TODO: configurable
     const indexPath = `${storePath}/${storeHash}.html`
@@ -180,7 +182,7 @@ export default class ARticle {
     }
     console.log(`Processing...`)
     await Promise.allSettled(toProcess)
-
+    console.log(toProcess)
   }
 
 
