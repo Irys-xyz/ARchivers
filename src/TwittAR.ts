@@ -150,12 +150,8 @@ async function processTweet(tweet) {
             // upload dir
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
             if (mres != "none") {
-                if (!mres) {
-                    console.log(`null media manifest for tweet str_ID ${tweet.id_str}`)
-                } else {
-                    tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
-                    console.log(`https://node1.bundlr.network/tx/${mres}/data`)
-                }
+                tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
+                console.log(`https://node1.bundlr.network/tx/${mres}/data`)
             }
 
             // clean up manifest and ID file.
