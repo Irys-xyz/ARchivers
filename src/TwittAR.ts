@@ -78,7 +78,7 @@ async function processTweet(tweet) {
             { name: "Author-Name", value: `${tweet.user.name}` },
             { name: "Author-Handle", value: `@${tweet.user.screen_name}` },
             { name: "Content-Type", value: "application/json" },
-            { name: "Key-Word-List", value: "ukraine2" }
+            { name: "Key-Word-List", value: "ukraine3" }
         ];
 
         if (tweet?.in_reply_to_status_id) {
