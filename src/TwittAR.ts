@@ -149,7 +149,7 @@ async function processTweet(tweet) {
         if (tmpdir) {
             // upload dir
             const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
-            if (mres != "none") {
+            if (mres && mres != "none") {
                 tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
                 console.log(`https://node1.bundlr.network/tx/${mres}/data`)
             }
