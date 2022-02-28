@@ -21,5 +21,6 @@
     "walletPath": "./wallet.json",
     "bundlrNode": "https://node1.bundlr.network",
     "difference": 0.02,
-    "refreshPeriod": "-4 hours"
+    "refreshPeriod": "-4 hours",
+    "queryID": "Ukraine1"
 }
