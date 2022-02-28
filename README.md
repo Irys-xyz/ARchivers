@@ -25,9 +25,10 @@ For ARticle, you need a NewsAPI API key - which you can get at https://newsapi.o
 Add this to your `wallet.json` (or example.wallet.json - rename to wallet.json)  
 (it can be run without as an external import - just don't invoke `updateNewsApi`).
 
-Tweak config.json as required, adding in `keyterms` - tweak `instances` to about 50% of your `MAX_CONCURRENT_SESSIONS` value.  
+Tweak config.json as required, adding in `keyterms` - tweak `instances` to about 80% of your `MAX_CONCURRENT_SESSIONS` value.  
 
-If you are noticing too many re-uploads of unchanged data, or that the system is not responding to changes, change the `difference` value in the config - lower = more sensitive to changes.
+If you are noticing too many re-uploads of unchanged data, or that the system is not responding to changes, change the `difference` value in the config - lower = more sensitive to changes.  
+Remember to change the `queryID` value in the configuration to distinguish your collection from others - you can always filter by owner address, but this allows for more fine grained control.
 
 ### Running
 
