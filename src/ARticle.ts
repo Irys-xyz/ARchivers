@@ -8,9 +8,11 @@ import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import { compareTwoStrings } from "string-similarity"
 import Bundlr from "@bundlr-network/client";
 
-import pLimit from "p-limit";
-
 import knex, { Knex } from "knex";
+import AsyncIterPromisePool from "./AsyncIteratorPromisePool";
+// import { Transform } from "stream";
+// import PromisePool from "es6-promise-pool";
+// import { processMediaURL } from "./TwittAR";
 
 export const checkPath = async (path: PathLike): Promise<boolean> => { return stat(path).then(_ => true).catch(_ => false) }
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,10 +86,9 @@ export default class ARticle {
  */
   async processURL(url): Promise<any> {
     // check, add if missing, and then get DB entry for URL.
-    const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates"]).where('url', '=', url).whereRaw(`lastCheck < Datetime('now', ? , 'localtime')`, [this.refreshPeriod]).first();
+    const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates"]).where('url', '=', url).whereRaw(`lastCheck < Datetime('now', ? , 'localtime')`, [this.refreshPeriod]).first()
 
-    if (!entry) { return }
-
+    if (!entry) { return "no entry" }
     // if (!((+new Date() - +entry.lastCheck) >= 1_800_000)) { // if it's been > 30mins since last check  continue
     //   console.log(`${url} was checked < 30 minutes ago, skipping...`)
     //   return;
@@ -128,7 +129,7 @@ export default class ARticle {
     // console.log(`relDiff: ${relativeDiff}`);
     if (relativeDiff < this.diff) { // must be at least 2% different 
       console.log(`${url} was not different enough from saved copy (${relativeDiff}).. assuming no changes.`)
-      return
+      return "not different enough"
     } else {
       console.log(`Update detected for ${url} - RD: ${relativeDiff}`)
       entry.updates++;
@@ -147,9 +148,7 @@ export default class ARticle {
       console.log(`Uploaded ${url} to ${tx.id}`)
     }
     await this.db("ARticle").where('url', '=', url).update({ updates: entry.updates, lastCheck: new Date().toISOString().slice(0, 19).replace('T', ' '), normalisedDiff: entry.normalisedDiff })
-    return;
-
-
+    return "done";
   }
 
   public async addUrl(url) {
@@ -166,31 +165,38 @@ export default class ARticle {
       console.error(`Error getting newsAPI articles - ${res.statusText}`)
     }
     console.log(`adding ${res.data.articles.length} articles to the pool...`);
-    await res.data.articles.forEach(async (a) => {
-      await this.addUrl(a.url)
-    })
+    const articles = res?.data?.articles ?? [];
+
+    for (let i = 0; i < articles.length; i++) {
+      await this.addUrl(articles[i].url)
+    }
+    // await res.data.articles.forEach(async (a) => {
+    //   await this.addUrl(a.url)
+    // })
     console.log(`Added articles`)
   }
 
+
   async update() {
-    const limit = pLimit(this.instances)
-    let toProcess = []
-    const urls = this.db("ARticle").select("url").orderBy("firstCheck", "asc").stream();
-    for await (const { url } of urls) {
-      toProcess.push(
-        limit(() => this.processURL(url))
-      )
-    }
+
+    const source = async function* () {
+      const count = (await this.db("ARticle").count("*").first())["count(*)"]
+      for (let i = 0; i < count; i++) {
+        const r = await this.db("ARticle").select().offset(i).limit(1)
+        yield r[0]
+      }
+    }.bind(this) // allow access to class methods
+
+    const preprocessor = async (i) => {
+      return i?.url ?? "https://bbc.co.uk"
+    }//.bind(this)
+
     console.log(`Processing...`)
-    await Promise.allSettled(toProcess)
+    const urls = source.call()
+    const pool = new AsyncIterPromisePool(urls, this.processURL.bind(this), this.instances, preprocessor)
+    await pool.startProcessing();
   }
-
-
-
 }
-
-
-
 
 
 export function createCron(name: string, time: string, fn: () => Promise<void>): void {
@@ -217,17 +223,15 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 
-
 export async function init(configPath) {
   const config = JSON.parse(readFileSync(configPath).toString());
   const article = new ARticle(config)
   await article.ready();
-  // await article.updateNewsApi("ukraine");
-  // await article.update();
   createCron("update sources", "0 */3 * * * *", () => article.updateNewsApi())
   createCron("scan for changes", "0 */1 * * * *", () => article.update())
   console.log("cron init done")
-  //await article.update();
+  await article.updateNewsApi()
+  // await article.update();
 }
 
 
