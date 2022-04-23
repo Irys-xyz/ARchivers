@@ -64,6 +64,7 @@ async function scrapeAll(url: string) {
         await navigatePageSimple(page, url, { waitFor: 10000 });
         // await new Promise(res => setTimeout(res, 1000 * 90));
 
+        const resolvedUrl = page.url()
         const pass0 = await page.evaluate(archivePagePass0);
 
         //await new Promise(res => setTimeout(res, 1000 * 30));
@@ -72,7 +73,7 @@ async function scrapeAll(url: string) {
 
         page.browser().disconnect();
 
-        return { pass0, retrievedResources, embeddedResources: pass0.embeddedResources }
+        return { pass0, retrievedResources, embeddedResources: pass0.embeddedResources, resolvedUrl }
 
     } catch (e) {
         page.browser().disconnect();
@@ -82,10 +83,10 @@ async function scrapeAll(url: string) {
 }
 
 
-export async function pageArchiver(url): Promise<string> {
+export async function pageArchiver(url): Promise<[string, string]> {
     return new Promise((resolve, reject) => {
 
-        scrapeAll(url).then(async ({ pass0, retrievedResources, embeddedResources }) => {
+        scrapeAll(url).then(async ({ pass0, retrievedResources, embeddedResources, resolvedUrl }) => {
 
             // writeFileSync(`${outFolder}/original.html`, `${pass0.docType}\n${pass0.html}`);
 
@@ -160,7 +161,7 @@ export async function pageArchiver(url): Promise<string> {
             // await mkdir(outFolder, { recursive: true });
             // writeFileSync(`${outFolder}/index.html`, out);
             // writeFileSync(`${outFolder}/DATA.json`, JSON.stringify({ embeddedResources: pass0.embeddedResources, externalResources: pass0.externalResources, }, undefined, 2));
-            resolve(out)
+            resolve([out, resolvedUrl])
         }).catch(e => reject(e))
     })
 

@@ -9,3 +9,5 @@ ARchiver.db-shm
 ARchiver.db-wal
 .env
 config.json
+.devcontainer/
+test.ts

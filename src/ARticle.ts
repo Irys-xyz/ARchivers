@@ -109,13 +109,14 @@ export default class ARticle {
       await mkdir(storePath, { recursive: true })
     };
 
-    const siteData = await pageArchiver(url)
+    const [siteData, resolvedUrl] = await pageArchiver(url)
+
     const indexPresent = await checkPath(indexPath)
     let cachedData;
     if ((!indexPresent) || entry.updates % 5 === 0) {
       // re-calibrate difference if it's the "5nth" update
       // perform another query to get the average difference between pages regardless of critical content change.
-      let siteData2 = await pageArchiver(url);
+      let [siteData2, _] = await pageArchiver(url);
       entry.normalisedDiff = await compareTwoStrings(siteData, siteData2)
       siteData2 = ""; //wipe it
       // console.log(`normDiff: ${entry.normalisedDiff}`)
@@ -127,7 +128,8 @@ export default class ARticle {
     }
 
     const diffVal = await compareTwoStrings(siteData, cachedData);
-    const relativeDiff = Math.abs(diffVal - entry.normalisedDiff)
+    let relativeDiff = Math.abs(diffVal - entry.normalisedDiff)
+
     // console.log(`relDiff: ${relativeDiff}`);
     if (relativeDiff < this.diff) { // must be at least 2% different 
       console.log(`${url} was not different enough from saved copy (${relativeDiff}).. assuming no changes.`)
@@ -143,7 +145,7 @@ export default class ARticle {
         { name: "Content-Type", value: "text/html" },
         // { name: "News-API-Query", value: `${this.query}` },
         { name: "Key-Word-List", value: `${this.keywordListID}` },
-        { name: "URL", value: `${url}` }
+        { name: "URL", value: `${resolvedUrl}` }
       ];
       const tx = await this.bundlr.createTransaction(siteData, { tags })
       await tx.sign();
