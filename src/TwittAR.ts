@@ -74,16 +74,17 @@ async function processTweet(tweet) {
 
         const tags = [
             { name: "Application", value: "TwittAR" },
-            { name: "Tweet-ID", value: `${tweet.id_str}` },
-            { name: "Author-ID", value: `${tweet.user.id_str}` },
-            { name: "Author-Name", value: `${tweet.user.name}` },
-            { name: "Author-Handle", value: `@${tweet.user.screen_name}` },
+            { name: "Tweet-ID", value: `${tweet.id_str ?? "unknown"}` },
+            { name: "Author-ID", value: `${tweet.user.id_str ?? "unknown"}` },
+            { name: "Author-Name", value: `${tweet.user.name ?? "unknown"}` },
+            { name: "Author-Handle", value: `@${tweet.user.screen_name ?? "unknown"}` },
             { name: "Content-Type", value: "application/json" },
-            { name: "Key-Word-List", value: `${config.keywordListID}` }
+            { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
+            { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
         ];
 
         if (tweet?.in_reply_to_status_id) {
-            tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str}` })
+            tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
         }
 
         if (tweet?.extended_entities?.media?.length > 0) {
