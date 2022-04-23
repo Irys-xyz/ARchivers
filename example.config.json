@@ -12,7 +12,7 @@
         "Луганськ",
         "Донба́с"
     ],
-    "keywordListID": "ukraine3",
+    "keywordListID": "ukraine-russia-war",
     "userIDs": [
         "718916004072570880",
         "2315512764"
@@ -22,6 +22,5 @@
     "walletPath": "./wallet.json",
     "bundlrNode": "https://node1.bundlr.network",
     "difference": 0.02,
-    "refreshPeriod": "-4 hours",
-    "queryID": "Ukraine1"
+    "refreshPeriod": "-4 hours"
 }

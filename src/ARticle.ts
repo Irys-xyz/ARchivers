@@ -34,16 +34,18 @@ export default class ARticle {
   private query: string
   private diff: number
   refreshPeriod: string;
-  queryID: string
+  // queryID: string
+  keywordListID: string
 
 
 
-  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string }) {
+  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string, keywordListID: string }) {
     this.instances = config.instances;
     this.query = config.query;
     this.diff = config.difference
     this.refreshPeriod = config.refreshPeriod ?? `-4 hours`;
-    this.queryID = config.queryID ?? "unknown"
+    // this.queryID = config.queryID ?? "unknown"
+    this.keywordListID = config.keywordListID ?? "unknown"
 
     this.db = knex({
       client: "better-sqlite3",
@@ -139,7 +141,8 @@ export default class ARticle {
       const tags = [
         { name: "Application", value: "ARticle" },
         { name: "Content-Type", value: "text/html" },
-        { name: "Query-ID", value: `${this.queryID}` },
+        // { name: "News-API-Query", value: `${this.query}` },
+        { name: "Key-Word-List", value: `${this.keywordListID}` },
         { name: "URL", value: `${url}` }
       ];
       const tx = await this.bundlr.createTransaction(siteData, { tags })
