@@ -20,10 +20,11 @@ let twitter
 let bundlr
 let article: ARticle;
 
+let config;
 
 async function main() {
 
-    const config = JSON.parse(readFileSync("config.json").toString());
+    config = JSON.parse(readFileSync("config.json").toString());
     const keys = JSON.parse(readFileSync(config.walletPath).toString());
 
     twitter = new Twitter({
@@ -78,7 +79,7 @@ async function processTweet(tweet) {
             { name: "Author-Name", value: `${tweet.user.name}` },
             { name: "Author-Handle", value: `@${tweet.user.screen_name}` },
             { name: "Content-Type", value: "application/json" },
-            { name: "Key-Word-List", value: "ukraine3" }
+            { name: "Key-Word-List", value: `${config.keywordListID}` }
         ];
 
         if (tweet?.in_reply_to_status_id) {
