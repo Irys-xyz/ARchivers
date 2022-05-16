@@ -7,6 +7,8 @@ import { PathLike, promises, readFileSync } from "fs";
 import { createWriteStream } from "fs";
 import axios from "axios"
 import ARticle from "./ARticle";
+import Arweave from "arweave";
+import Arfund from "arfunds/build/library/Arfunds";
 
 let TPS = 0;
 let pTPS = 0
@@ -18,12 +20,11 @@ const checkPath = async (path: PathLike): Promise<boolean> => { return promises.
 
 let twitter
 let bundlr
-let article: ARticle;
 
 let config;
 
-async function main() {
-
+async function main(poolContract) {
+    console.log(poolContract);
     config = JSON.parse(readFileSync("config.json").toString());
     const keys = JSON.parse(readFileSync(config.walletPath).toString());
 
@@ -35,11 +36,22 @@ async function main() {
         tweet_mode: "extended"
     })
     bundlr = new Bundlr(config.bundlrNode, "arweave", keys.arweave)
-    article = new ARticle(config)
 
     console.log(`Loaded with account address: ${bundlr.address}`)
-    //await processTweet(tweet)
-    twitter.on('tweet', processTweet)
+    const arweave = Arweave.init({
+                host: "arweave.net",
+                port: 443,
+                protocol: "https",
+                timeout: 20000,
+                logging: false,
+        });
+    const poolId = poolContract;
+    const fund = new Arfund(poolId, arweave, true);
+
+
+    console.log(`Loading archiving pool :${poolId}`);
+    //await processTwee(tweet)
+    twitter.on('tweet', (tweet) => processTweet(tweet, fund));
 
     twitter.on('error', (e) => {
         console.error(`tStream error: ${e.stack}`)
@@ -51,12 +63,14 @@ async function main() {
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
     // twitter.follow("957688150574469122")
+
+    
 }
 
 
 
 
-async function processTweet(tweet) {
+async function processTweet(tweet, fund) {
     let tmpdir;
     try {
         TPS++
@@ -92,12 +106,29 @@ async function processTweet(tweet) {
          * Contract-Src: tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0
          * Init-State: { init state json }
          */
+	const tokenHolder = fund.getRandomContributor();
 
-        tags.push({ name: "App-Name", value: "SmartweaveContract");
+	const initialState = {
+		"title": "TwittAR Artefact",
+		"name": `Artefact #${tweet.id_str ?? "unknown"}`,
+		"description": `Archiving pool ${fund.getPoolId()}`,
+		"ticker": "KOINFT",
+		"balances": {
+		},
+		"owners": {
+		},
+		"maxSupply": 1,
+		"contentType": "application/json"
+	}
+	initialState.balances[tokenHolder] = 1;
+	initialState.owners["1"] = tokenHolder;	
+        tags.push({ name: "App-Name", value: "SmartWeaveContract"});
         tags.push({ name: "App-Version", value: "0.3.0"});
         tags.push({ name: "Action", value: "marketplace/Create"});
         tags.push({ name: "Network", value: "Koi" });
         tags.push({ name: "Contract-Src", value: "tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0"});
+	tags.push({ name: "Init-State", value: JSON.stringify(initialState) });
+
 
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
@@ -152,8 +183,7 @@ async function processTweet(tweet) {
                     // if it links a web page:
                     if (contentType === "text/html") {
                         // add to article DB.
-                        console.log(`giving ${url} to ARticle`)
-                        await article.addUrl(url)
+                        console.log(`ignoring urls`)
                     } else {
                         await processMediaURL(url, linkPath, i)
                     }
@@ -188,7 +218,8 @@ async function processTweet(tweet) {
         const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
         await tx.sign();
         await tx.upload()
-        pTPS++
+        console.log(tx.id);
+	pTPS++
 
     } catch (e) {
         console.log(`general error: ${e.stack ?? e.message}`)
@@ -219,4 +250,4 @@ export async function processMediaURL(url: string, dir: string, i: number) {
     })
 
 }
-main();
+main(process.argv[2]);
