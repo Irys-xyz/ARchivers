@@ -118,7 +118,8 @@ async function processTweet(tweet, fund) {
 		"owners": {
 		},
 		"maxSupply": 1,
-		"contentType": "application/json"
+		"contentType": "application/json",
+		"transferable": false
 	}
 	initialState.balances[tokenHolder] = 1;
 	initialState.owners["1"] = tokenHolder;	
