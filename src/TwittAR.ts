@@ -82,6 +82,22 @@ async function processTweet(tweet) {
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
             { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
         ];
+	
+	/**
+         * Koi NFT params
+         * App-Name: SmartWeaveContract
+         * App-Version: 0.3.0
+         * Action: marketplace/Create
+         * Network: Koi
+         * Contract-Src: tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0
+         * Init-State: { init state json }
+         */
+
+        tags.push({ name: "App-Name", value: "SmartweaveContract");
+        tags.push({ name: "App-Version", value: "0.3.0"});
+        tags.push({ name: "Action", value: "marketplace/Create"});
+        tags.push({ name: "Network", value: "Koi" });
+        tags.push({ name: "Contract-Src", value: "tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0"});
 
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
