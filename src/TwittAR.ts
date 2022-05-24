@@ -103,11 +103,9 @@ async function processTweet(tweet, fund) {
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
             { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
         ];
-	console.log("before NFT");	
 	const nftTags = await fund.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
 	
 	tags = tags.concat(nftTags);
-	console.log("after NFT");
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
         }
