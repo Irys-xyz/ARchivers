@@ -55,7 +55,7 @@ async function main(poolContract) {
     twitter.on('tweet', (tweet) => {
 		count++;
 		processTweet(tweet, fund);
-    		if (count == 12) {
+    		if (count == 3) {
 			twitter.destroy();
 		}
 	});
