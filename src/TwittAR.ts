@@ -48,17 +48,12 @@ async function main(poolContract) {
     const poolId = poolContract;
     const fund = new Arfund(poolId, arweave, true);
 
-
     console.log(`Loading archiving pool :${poolId}`);
-    //await processTwee(tweet)
+
     let count = 0;
     twitter.on('tweet', (tweet) => {
-		count++;
 		processTweet(tweet, fund);
-    		if (count == 3) {
-			twitter.destroy();
-		}
-	});
+    });
 
     twitter.on('error', (e) => {
         console.error(`tStream error: ${e.stack}`)
@@ -69,9 +64,6 @@ async function main(poolContract) {
     console.log(`Tracking users: ${trackUsers}`)
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
-    // twitter.follow("957688150574469122")
-
-    
 }
 
 
