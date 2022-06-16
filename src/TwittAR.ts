@@ -48,10 +48,12 @@ async function main(poolContract) {
     const poolId = poolContract;
     const fund = new Arfund(poolId, arweave, true);
 
-
     console.log(`Loading archiving pool :${poolId}`);
-    //await processTwee(tweet)
-    twitter.on('tweet', (tweet) => processTweet(tweet, fund));
+
+    let count = 0;
+    twitter.on('tweet', (tweet) => {
+		processTweet(tweet, fund);
+    });
 
     twitter.on('error', (e) => {
         console.error(`tStream error: ${e.stack}`)
@@ -62,9 +64,6 @@ async function main(poolContract) {
     console.log(`Tracking users: ${trackUsers}`)
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
-    // twitter.follow("957688150574469122")
-
-    
 }
 
 
@@ -86,7 +85,7 @@ async function processTweet(tweet, fund) {
          * Key-Word-List: keyword set : string
          */
 
-        const tags = [
+        let tags = [
             { name: "Application", value: "TwittAR" },
             { name: "Tweet-ID", value: `${tweet.id_str ?? "unknown"}` },
             { name: "Author-ID", value: `${tweet.user.id_str ?? "unknown"}` },
@@ -96,41 +95,9 @@ async function processTweet(tweet, fund) {
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
             { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
         ];
+	const nftTags = await fund.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
 	
-	/**
-         * Koi NFT params
-         * App-Name: SmartWeaveContract
-         * App-Version: 0.3.0
-         * Action: marketplace/Create
-         * Network: Koi
-         * Contract-Src: tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0
-         * Init-State: { init state json }
-         */
-	const tokenHolder = fund.getRandomContributor();
-
-	const initialState = {
-		"title": "TwittAR Artefact",
-		"name": `Artefact #${tweet.id_str ?? "unknown"}`,
-		"description": `Archiving pool ${fund.getPoolId()}`,
-		"ticker": "KOINFT",
-		"balances": {
-		},
-		"owners": {
-		},
-		"maxSupply": 1,
-		"contentType": "application/json",
-		"transferable": false
-	}
-	initialState.balances[tokenHolder] = 1;
-	initialState.owners["1"] = tokenHolder;	
-        tags.push({ name: "App-Name", value: "SmartWeaveContract"});
-        tags.push({ name: "App-Version", value: "0.3.0"});
-        tags.push({ name: "Action", value: "marketplace/Create"});
-        tags.push({ name: "Network", value: "Koi" });
-        tags.push({ name: "Contract-Src", value: "tWSBznzm4ccTlgxRBUmbU-5nqMXtH9W4WhNHVeZS0q0"});
-	tags.push({ name: "Init-State", value: JSON.stringify(initialState) });
-
-
+	tags = tags.concat(nftTags);
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
         }
