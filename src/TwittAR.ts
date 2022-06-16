@@ -7,6 +7,8 @@ import { PathLike, promises, readFileSync } from "fs";
 import { createWriteStream } from "fs";
 import axios from "axios"
 import ARticle from "./ARticle";
+import Arweave from "arweave";
+import Arfund from "arfunds/build/library/Arfunds";
 
 let TPS = 0;
 let pTPS = 0
@@ -18,12 +20,11 @@ const checkPath = async (path: PathLike): Promise<boolean> => { return promises.
 
 let twitter
 let bundlr
-let article: ARticle;
 
 let config;
 
-async function main() {
-
+async function main(poolContract) {
+    console.log(poolContract);
     config = JSON.parse(readFileSync("config.json").toString());
     const keys = JSON.parse(readFileSync(config.walletPath).toString());
 
@@ -35,11 +36,24 @@ async function main() {
         tweet_mode: "extended"
     })
     bundlr = new Bundlr(config.bundlrNode, "arweave", keys.arweave)
-    article = new ARticle(config)
 
     console.log(`Loaded with account address: ${bundlr.address}`)
-    //await processTweet(tweet)
-    twitter.on('tweet', processTweet)
+    const arweave = Arweave.init({
+                host: "arweave.net",
+                port: 443,
+                protocol: "https",
+                timeout: 20000,
+                logging: false,
+        });
+    const poolId = poolContract;
+    const fund = new Arfund(poolId, arweave, true);
+
+    console.log(`Loading archiving pool :${poolId}`);
+
+    let count = 0;
+    twitter.on('tweet', (tweet) => {
+		processTweet(tweet, fund);
+    });
 
     twitter.on('error', (e) => {
         console.error(`tStream error: ${e.stack}`)
@@ -50,13 +64,12 @@ async function main() {
     console.log(`Tracking users: ${trackUsers}`)
     twitter.track(trackKeyWords)
     twitter.follow(trackUsers)
-    // twitter.follow("957688150574469122")
 }
 
 
 
 
-async function processTweet(tweet) {
+async function processTweet(tweet, fund) {
     let tmpdir;
     try {
         TPS++
@@ -72,7 +85,7 @@ async function processTweet(tweet) {
          * Key-Word-List: keyword set : string
          */
 
-        const tags = [
+        let tags = [
             { name: "Application", value: "TwittAR" },
             { name: "Tweet-ID", value: `${tweet.id_str ?? "unknown"}` },
             { name: "Author-ID", value: `${tweet.user.id_str ?? "unknown"}` },
@@ -82,7 +95,9 @@ async function processTweet(tweet) {
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
             { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
         ];
-
+	const nftTags = await fund.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
+	
+	tags = tags.concat(nftTags);
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
         }
@@ -136,8 +151,7 @@ async function processTweet(tweet) {
                     // if it links a web page:
                     if (contentType === "text/html") {
                         // add to article DB.
-                        console.log(`giving ${url} to ARticle`)
-                        await article.addUrl(url)
+                        console.log(`ignoring urls`)
                     } else {
                         await processMediaURL(url, linkPath, i)
                     }
@@ -172,7 +186,8 @@ async function processTweet(tweet) {
         const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
         await tx.sign();
         await tx.upload()
-        pTPS++
+        console.log(tx.id);
+	pTPS++
 
     } catch (e) {
         console.log(`general error: ${e.stack ?? e.message}`)
@@ -203,4 +218,4 @@ export async function processMediaURL(url: string, dir: string, i: number) {
     })
 
 }
-main();
+main(process.argv[2]);

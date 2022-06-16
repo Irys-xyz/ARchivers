@@ -10,10 +10,7 @@ module.exports = // ecosystem.js
         {
             "name": "TwittAR",
             "script": "build/TwittAR.js",
-        },
-        {
-            "name": "ARticle",
-            "script": "build/ARticle.js",
-        }
+       	    "args": ["_XBR5_WFzWdI_7a2lDa9nSA_C2qahNhjBMDJfRDAweM"]
+	}
     ],
 };
