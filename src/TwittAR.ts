@@ -2,13 +2,14 @@ import Twitter from "node-tweet-stream";
 import Bundlr from "@bundlr-network/client"
 import tmp from "tmp-promise"
 import * as p from "path"
-import { mkdir, unlink } from "fs/promises";
+import { mkdir } from "fs/promises";
 import { PathLike, promises, readFileSync } from "fs";
 import { createWriteStream } from "fs";
 import axios from "axios"
 import ARticle from "./ARticle";
 import Arweave from "arweave";
-import Arfund from "arfunds/build/library/Arfunds";
+import FundPool from "@bundlr-network/hero-funds"
+import mime from "mime-types";
 
 let TPS = 0;
 let pTPS = 0
@@ -18,13 +19,21 @@ setInterval(() => {
 
 const checkPath = async (path: PathLike): Promise<boolean> => { return promises.stat(path).then(_ => true).catch(_ => false) }
 
-let twitter
-let bundlr
+async function* walk(dir: string) {
+    for await (const d of await promises.opendir(dir)) {
+        const entry = p.join(dir, d.name);
+        if (d.isDirectory()) yield* await walk(entry);
+        else if (d.isFile()) yield entry;
+    }
+}
 
+let twitter
+let bundlr: Bundlr
+let pool: FundPool
+let article: ARticle
 let config;
 
-async function main(poolContract) {
-    console.log(poolContract);
+async function main() {
     config = JSON.parse(readFileSync("config.json").toString());
     const keys = JSON.parse(readFileSync(config.walletPath).toString());
 
@@ -39,21 +48,20 @@ async function main(poolContract) {
 
     console.log(`Loaded with account address: ${bundlr.address}`)
     const arweave = Arweave.init({
-                host: "arweave.net",
-                port: 443,
-                protocol: "https",
-                timeout: 20000,
-                logging: false,
-        });
-    const poolId = poolContract;
-    const fund = new Arfund(poolId, arweave, true);
-
-    console.log(`Loading archiving pool :${poolId}`);
-
-    let count = 0;
-    twitter.on('tweet', (tweet) => {
-		processTweet(tweet, fund);
+        host: "arweave.net",
+        port: 443,
+        protocol: "https",
+        timeout: 20000,
+        logging: false,
     });
+
+
+
+    pool = new FundPool(config.pool.contract, arweave, true);
+    article = new ARticle(config)
+    console.log(`Loading archiving pool :${config.poolContract}`);
+
+    twitter.on('tweet', processTweet);
 
     twitter.on('error', (e) => {
         console.error(`tStream error: ${e.stack}`)
@@ -67,10 +75,9 @@ async function main(poolContract) {
 }
 
 
+async function processTweet(tweet) {
+    const tmpdir = await tmp.dir({ unsafeCleanup: true })
 
-
-async function processTweet(tweet, fund) {
-    let tmpdir;
     try {
         TPS++
         if (tweet.retweeted_status) { //retweet, ignore.
@@ -91,22 +98,21 @@ async function processTweet(tweet, fund) {
             { name: "Author-ID", value: `${tweet.user.id_str ?? "unknown"}` },
             { name: "Author-Name", value: `${tweet.user.name ?? "unknown"}` },
             { name: "Author-Handle", value: `@${tweet.user.screen_name ?? "unknown"}` },
-            { name: "Content-Type", value: "application/json" },
+            { name: "Content-Type", value: "application/x.arweave-manifest+json" },
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
-            { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` }
+            { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` },
+            { name: "Type", value: "manifest" }
         ];
-	const nftTags = await fund.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
-	
-	tags = tags.concat(nftTags);
+
+        const nftTags = await pool.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
+        tags = tags.concat(nftTags);
+
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
         }
 
         if (tweet?.extended_entities?.media?.length > 0) {
             try {
-                if (!tmpdir) {
-                    tmpdir = await tmp.dir({ unsafeCleanup: true })
-                }
                 const mediaDir = p.join(tmpdir.path, "media")
                 if (!await checkPath(mediaDir)) {
                     await mkdir(mediaDir)
@@ -136,9 +142,6 @@ async function processTweet(tweet, fund) {
                     if (url === `https://twitter.com/i/web/status/${tweet.id_str}`) {
                         continue;
                     }
-                    if (!tmpdir) {
-                        tmpdir = await tmp.dir({ unsafeCleanup: true })
-                    }
                     const headres = await axios.head(url).catch((e) => {
                         console.log(`heading ${url} - ${e.message}`)
                     })
@@ -161,33 +164,54 @@ async function processTweet(tweet, fund) {
             }
 
         }
-        // if the tweet had some attachments, upload the tmp folder containing said media/site snapshots.
-        if (tmpdir) {
-            // upload dir
-            const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
-            if (mres && mres != "none") {
-                tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
-                console.log(`https://node1.bundlr.network/tx/${mres}/data`)
-            }
-
-            // clean up manifest and ID file.
-            const mpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-manifest.json`)
-            if (await checkPath(mpath)) {
-                await unlink(mpath);
-            }
-            const idpath = p.join(p.join(tmpdir.path, `${p.sep}..`), `${p.basename(tmpdir.path)}-id.txt`)
-            if (await checkPath(idpath)) {
-                await unlink(idpath);
-            }
-
-            await tmpdir.cleanup()
+        // // if the tweet had some attachments, upload the tmp folder containing said media/site snapshots.
+        // if (tmpdir) {
+        // upload dir
+        // const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
+        const manifest = {
+            manifest: "arweave/paths",
+            version: "0.1.0",
+            index: {},
+            paths: {}
         }
 
-        const tx = await bundlr.createTransaction(JSON.stringify(tweet), { tags: tags })
-        await tx.sign();
-        await tx.upload()
-        console.log(tx.id);
-	pTPS++
+        const subTags = [
+            { name: "Application", value: "TwittAR" },
+            { name: "Tweet-ID", value: `${tweet.id_str ?? "unknown"}` }
+        ]
+
+        for await (const f of walk(tmpdir.path)) {
+            const relPath = p.relative(tmpdir.path, f)
+            try {
+                const mimeType = mime.contentType(mime.lookup(relPath) || "application/octet-stream") as string
+                const res = await bundlr.uploader.upload(await promises.readFile(p.resolve(f)), subTags.concat([{ name: "Content-Type", value: mimeType }]))
+                if (!res?.data?.id) { throw new Error("Upload Error") }
+                manifest.paths[relPath] = { id: res?.data?.id }
+            } catch (e) {
+                console.log(`Error uploading ${f} for ${tweet.id_str} - ${e}`)
+                continue
+            }
+
+        }
+        const tweetRes = await bundlr.uploader.upload(Buffer.from(JSON.stringify(tweet)), subTags.concat([{ name: "Content-Type", value: "application/json" }]))
+        if (!tweetRes?.data?.id) {
+            console.log(`Error uploading tweet ${tweet.id_str}`)
+            return
+        }
+        manifest.paths["tweet.json"] = { id: tweetRes?.data?.id }
+        manifest.index = { path: "tweet.json" }
+
+
+        // if (mres && mres != "none") {
+        //     tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
+        //     console.log(`https://node1.bundlr.network/tx/${mres}/data`)
+        // }
+        console.log(manifest)
+
+        const manifestRes = await bundlr.uploader.upload(Buffer.from(JSON.stringify(manifest)), tags)
+        console.log(manifestRes)
+        await tmpdir.cleanup()
+        pTPS++
 
     } catch (e) {
         console.log(`general error: ${e.stack ?? e.message}`)
@@ -218,4 +242,4 @@ export async function processMediaURL(url: string, dir: string, i: number) {
     })
 
 }
-main(process.argv[2]);
+main();

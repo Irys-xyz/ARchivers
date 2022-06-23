@@ -7,9 +7,11 @@ import { pageArchiver } from "./pageArchiver";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import { compareTwoStrings } from "string-similarity"
 import Bundlr from "@bundlr-network/client";
+import Arweave from "arweave"
 
 import knex, { Knex } from "knex";
 import AsyncIterPromisePool from "./AsyncIteratorPromisePool";
+import ArFunds from "@bundlr-network/hero-funds"
 // import { Transform } from "stream";
 // import PromisePool from "es6-promise-pool";
 // import { processMediaURL } from "./TwittAR";
@@ -36,16 +38,29 @@ export default class ARticle {
   refreshPeriod: string;
   // queryID: string
   keywordListID: string
+  pool: ArFunds
+  config: Record<string, any>
 
 
 
-  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string, keywordListID: string }) {
+  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string, keywordListID: string, pool: { contract: string, transferable: string } }) {
+    this.config = config;
     this.instances = config.instances;
     this.query = config.query;
     this.diff = config.difference
     this.refreshPeriod = config.refreshPeriod ?? `-4 hours`;
     // this.queryID = config.queryID ?? "unknown"
     this.keywordListID = config.keywordListID ?? "unknown"
+
+    const arweave = Arweave.init({
+      host: "arweave.net",
+      port: 443,
+      protocol: "https",
+      timeout: 20000,
+      logging: false,
+    });
+
+    this.pool = new ArFunds(config.pool.contract, arweave, true)
 
     this.db = knex({
       client: "better-sqlite3",
