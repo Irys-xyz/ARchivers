@@ -8,8 +8,11 @@ import { createWriteStream } from "fs";
 import axios from "axios"
 import ARticle from "./ARticle";
 import Arweave from "arweave";
-import FundPool from "@bundlr-network/hero-funds"
+import { FundingPool } from "@bundlr-network/hero-funds"
 import mime from "mime-types";
+import { LoggerFactory, Warp, WarpNodeFactory } from "warp-contracts";
+import { getNextNFTId } from "./lock";
+
 
 let TPS = 0;
 let pTPS = 0
@@ -29,13 +32,16 @@ async function* walk(dir: string) {
 
 let twitter
 let bundlr: Bundlr
-let pool: FundPool
+let pool: FundingPool
 let article: ARticle
 let config;
+let warp: Warp
+let keys: any;
+let arweave: Arweave
 
 async function main() {
     config = JSON.parse(readFileSync("config.json").toString());
-    const keys = JSON.parse(readFileSync(config.walletPath).toString());
+    keys = JSON.parse(readFileSync(config.walletPath).toString());
 
     twitter = new Twitter({
         consumer_key: keys.tkeys.consumer_key,
@@ -50,16 +56,36 @@ async function main() {
     const arweave = Arweave.init({
         host: "arweave.net",
         port: 443,
-        protocol: "https",
-        timeout: 20000,
-        logging: false,
+        protocol: "https"
     });
 
 
+    // arweave = Arweave.init({
+    //     host: "localhost",
+    //     port: 1984,
+    //     protocol: "http",
+    //     timeout: 20000,
+    //     logging: false,
+    // });
 
-    pool = new FundPool(config.pool.contract, arweave, true);
+
+    // warp = WarpNodeFactory.forTesting(arweave)
+    // LoggerFactory.INST.logLevel('trace');
+    LoggerFactory.INST.logLevel("error", "DefaultStateEvaluator");
+    LoggerFactory.INST.logLevel("error", "HandlerBasedContract");
+    LoggerFactory.INST.logLevel("error", "HandlerExecutorFactory");
+
+
+    warp = WarpNodeFactory.memCached(arweave)
+
+
+    pool = new FundingPool({ poolId: config.pool.contract, nftContractSrc: config.nftContractSrc, arweave });
+
     article = new ARticle(config)
-    console.log(`Loading archiving pool :${config.poolContract}`);
+    await article.ready()
+    console.log(`Loading archiving pool :${config.pool.contract}`);
+    await article.addUrl("https://bbc.co.uk")
+    await article.processURL("https://bbc.co.uk")
 
     twitter.on('tweet', processTweet);
 
@@ -83,6 +109,7 @@ async function processTweet(tweet) {
         if (tweet.retweeted_status) { //retweet, ignore.
             return;
         }
+        // twitter.destroy()
 
         /**
          * Application: twittAR
@@ -98,14 +125,12 @@ async function processTweet(tweet) {
             { name: "Author-ID", value: `${tweet.user.id_str ?? "unknown"}` },
             { name: "Author-Name", value: `${tweet.user.name ?? "unknown"}` },
             { name: "Author-Handle", value: `@${tweet.user.screen_name ?? "unknown"}` },
-            { name: "Content-Type", value: "application/x.arweave-manifest+json" },
+            // { name: "Content-Type", value: "application/x.arweave-manifest+json" },
             { name: "Key-Word-List", value: `${config.keywordListID ?? "unknown"}` },
             { name: "Key-Word-List-Version", value: `${config.keywordListVersion ?? "unknown"}` },
-            { name: "Type", value: "manifest" }
+
         ];
 
-        const nftTags = await pool.getNftTags("TwittAR", tweet.id_str ?? "unknown", false);
-        tags = tags.concat(nftTags);
 
         if (tweet?.in_reply_to_status_id) {
             tags.push({ name: "In-Response-To-ID", value: `${tweet.in_reply_to_status_id_str ?? "unknown"}` })
@@ -154,7 +179,7 @@ async function processTweet(tweet) {
                     // if it links a web page:
                     if (contentType === "text/html") {
                         // add to article DB.
-                        console.log(`ignoring urls`)
+                        await article.addUrl(url)
                     } else {
                         await processMediaURL(url, linkPath, i)
                     }
@@ -164,10 +189,7 @@ async function processTweet(tweet) {
             }
 
         }
-        // // if the tweet had some attachments, upload the tmp folder containing said media/site snapshots.
-        // if (tmpdir) {
-        // upload dir
-        // const mres = await bundlr.uploader.uploadFolder(tmpdir.path, null, 10, false, async (_) => { })
+
         const manifest = {
             manifest: "arweave/paths",
             version: "0.1.0",
@@ -184,7 +206,7 @@ async function processTweet(tweet) {
             const relPath = p.relative(tmpdir.path, f)
             try {
                 const mimeType = mime.contentType(mime.lookup(relPath) || "application/octet-stream") as string
-                const res = await bundlr.uploader.upload(await promises.readFile(p.resolve(f)), subTags.concat([{ name: "Content-Type", value: mimeType }]))
+                const res = await bundlr.uploader.upload(await promises.readFile(p.resolve(f)), [...subTags, { name: "Content-Type", value: mimeType }])
                 if (!res?.data?.id) { throw new Error("Upload Error") }
                 manifest.paths[relPath] = { id: res?.data?.id }
             } catch (e) {
@@ -194,23 +216,48 @@ async function processTweet(tweet) {
 
         }
         const tweetRes = await bundlr.uploader.upload(Buffer.from(JSON.stringify(tweet)), subTags.concat([{ name: "Content-Type", value: "application/json" }]))
+
+
+
         if (!tweetRes?.data?.id) {
             console.log(`Error uploading tweet ${tweet.id_str}`)
             return
         }
+
+
+        // for local testing only
+        // const tmpTx = await arweave.createTransaction({ data: JSON.stringify(tweet) })
+        // tmpTx.addTag("Content-Type", "application/json")
+        // await arweave.transactions.sign(tmpTx, keys.arweave)
+        // await arweave.transactions.post(tmpTx)
+
+        // manifest.paths["tweet.json"] = { id: tmpTx.id }
+
         manifest.paths["tweet.json"] = { id: tweetRes?.data?.id }
+
         manifest.index = { path: "tweet.json" }
 
+        //console.log(manifest)
 
-        // if (mres && mres != "none") {
-        //     tags.push({ name: "Media-Manifest-ID", value: `${mres}` })
-        //     console.log(`https://node1.bundlr.network/tx/${mres}/data`)
-        // }
-        console.log(manifest)
+        const { tags: nftTags, initState } = await pool.getNftData(/* tweet.id_str ?? "unknown" */(await getNextNFTId()).toString(), config.pool.transferable);
+        tags = tags.concat(nftTags);
+        tags.push({ name: "Type", value: "manifest" })
+        // tags.push({ name: "Content-Type", value: "application/x.arweave-manifest+json" })
 
-        const manifestRes = await bundlr.uploader.upload(Buffer.from(JSON.stringify(manifest)), tags)
-        console.log(manifestRes)
-        await tmpdir.cleanup()
+        const txRes = await warp.createContract.deployFromSourceTx({
+            srcTxId: pool.nftContractSrc,
+            wallet: keys.arweave,
+            initState: JSON.stringify(initState),
+            data: { "Content-Type": "application/x.arweave-manifest+json", body: JSON.stringify(manifest) },
+            tags: tags
+        }, true)
+
+        // const tx = bundlr.createTransaction(JSON.stringify(manifest), { tags })
+        // await tx.sign()
+        // const txRes = await tx.upload()
+
+        console.log(txRes)
+
         pTPS++
 
     } catch (e) {

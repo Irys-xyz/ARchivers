@@ -2,7 +2,7 @@ import axios from "axios"
 import { CronJob } from "cron";
 
 import crypto from "crypto"
-import { PathLike, readFileSync } from "fs";
+import { PathLike, readFileSync, promises } from "fs";
 import { pageArchiver } from "./pageArchiver";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import { compareTwoStrings } from "string-similarity"
@@ -11,39 +11,41 @@ import Arweave from "arweave"
 
 import knex, { Knex } from "knex";
 import AsyncIterPromisePool from "./AsyncIteratorPromisePool";
-import ArFunds from "@bundlr-network/hero-funds"
-// import { Transform } from "stream";
-// import PromisePool from "es6-promise-pool";
-// import { processMediaURL } from "./TwittAR";
+import { FundingPool } from "@bundlr-network/hero-funds"
+import { Warp, WarpNodeFactory } from "warp-contracts";
+import { getNextNFTId } from "./lock";
+
 
 export const checkPath = async (path: PathLike): Promise<boolean> => { return stat(path).then(_ => true).catch(_ => false) }
-export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface archiveRow {
   url: string,
   lastCheck: string,
   firstCheck: string,
   normalisedDiff: number,
-  updates: number
+  updates: number,
+  lastUpdate: string
 }
 
 export default class ARticle {
 
   private keys
   private db: Knex
-  private bundlr
+  private bundlr: Bundlr
   protected instances: number;
   private query: string
   private diff: number
   refreshPeriod: string;
-  // queryID: string
   keywordListID: string
-  pool: ArFunds
+  pool: FundingPool
   config: Record<string, any>
+  id: number
+  warp: Warp
+  keywordListVersion: string;
 
 
 
-  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string, keywordListID: string, pool: { contract: string, transferable: string } }) {
+  constructor(config: { instances: number, query: string, walletPath: string, bundlrNode: string, difference: number, refreshPeriod: string, queryID: string, keywordListID: string, pool: { contract: string, transferable: string }, nftContractSrc: string, keywordListVersion: string }) {
     this.config = config;
     this.instances = config.instances;
     this.query = config.query;
@@ -51,6 +53,7 @@ export default class ARticle {
     this.refreshPeriod = config.refreshPeriod ?? `-4 hours`;
     // this.queryID = config.queryID ?? "unknown"
     this.keywordListID = config.keywordListID ?? "unknown"
+    this.keywordListVersion = config.keywordListVersion ?? "unknown"
 
     const arweave = Arweave.init({
       host: "arweave.net",
@@ -60,7 +63,15 @@ export default class ARticle {
       logging: false,
     });
 
-    this.pool = new ArFunds(config.pool.contract, arweave, true)
+    // const arweave = Arweave.init({
+    //   host: "localhost",
+    //   port: 1984,
+    //   protocol: "http",
+    //   timeout: 20000,
+    //   logging: false,
+    // });
+
+    this.pool = new FundingPool({ poolId: config.pool.contract, arweave, nftContractSrc: config.nftContractSrc })
 
     this.db = knex({
       client: "better-sqlite3",
@@ -72,6 +83,17 @@ export default class ARticle {
 
     })
 
+    // testing only!
+    // this.warp = WarpNodeFactory.forTesting(arweave)
+
+
+    // LoggerFactory.INST.logLevel('trace');
+    // LoggerFactory.INST.logLevel("trace", "DefaultStateEvaluator");
+    // LoggerFactory.INST.logLevel("trace", "HandlerBasedContract");
+    // LoggerFactory.INST.logLevel("trace", "HandlerExecutorFactory");
+
+    this.warp = WarpNodeFactory.memCached(arweave)
+
     this.keys = JSON.parse(readFileSync(config.walletPath).toString());
     this.bundlr = new Bundlr(config.bundlrNode, "arweave", this.keys.arweave)
     console.log(this.bundlr.address);
@@ -79,6 +101,19 @@ export default class ARticle {
 
 
   public async ready() {
+
+
+    const idcachePath = "./.idcache"
+    // check for file
+    if (!await checkPath(idcachePath)) {
+      // get number of artefacts uploaded by this pool
+      console.error("Unable to restore ID from cache file!")
+      await writeFile(idcachePath, "0")
+    }
+
+    this.id = +(await readFile(idcachePath)).toString()
+
+
     await this.db.raw(`PRAGMA journal_mode=WAL`);
 
     if (!await this.db.schema.hasTable('ARticle')) {
@@ -87,6 +122,7 @@ export default class ARticle {
         tbl.string("url").primary().unique();
         tbl.date("lastCheck").defaultTo(new Date().toISOString().slice(0, 19).replace('T', ' ')).notNullable()
         tbl.date("firstCheck").defaultTo(new Date().toISOString().slice(0, 19).replace('T', ' ')).notNullable()
+        tbl.date("lastUpdate").defaultTo(new Date().toISOString().slice(0, 19).replace('T', ' ')).notNullable()
         tbl.float("normalisedDiff").defaultTo(0).notNullable()
         tbl.integer("updates").defaultTo(0).notNullable()
       })
@@ -101,78 +137,150 @@ export default class ARticle {
  * designed for use on articles, actually works on basically anything (provided proper modifications to pageArchiver are made)
  * @param url - URL to check
  */
-  async processURL(url): Promise<any> {
-    // check, add if missing, and then get DB entry for URL.
-    const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates"]).where('url', '=', url).whereRaw(`lastCheck < Datetime('now', ? , 'localtime')`, [this.refreshPeriod]).first()
+  public async processURL(url: string): Promise<any> {
+    try {
+      let Url = url
+      // check, add if missing, and then get DB entry for URL.
+      const entry: archiveRow = await this.db("ARticle").select(["normalisedDiff", "updates", "lastUpdate"]).where('url', '=', Url).whereRaw(`lastCheck < Datetime('now', ? , 'localtime')`, [this.refreshPeriod]).first()
 
-    if (!entry) { return "no entry" }
-    // if (!((+new Date() - +entry.lastCheck) >= 1_800_000)) { // if it's been > 30mins since last check  continue
-    //   console.log(`${url} was checked < 30 minutes ago, skipping...`)
-    //   return;
-    // }
-    // if (((+new Date() - +entry.start) >= 2_592_000_000)) { // if it's been tracked for more than a month abort
-    //   console.log("tracked for more than a month, stopping...")
-    // }
+      if (!entry) { return "no entry" }
 
-    // get storage hash ID
-    const storeHash = crypto.createHash('sha256').update(url).digest('hex');
-    console.log(`URL:SH ${url} : ${storeHash}`)
-    const storePath = "./sites" // TODO: configurable
-    const indexPath = `${storePath}/${storeHash}.html`
+      // if (!((+new Date() - +entry.lastCheck) >= 1_800_000)) { // if it's been > 30mins since last check  continue
+      //   console.log(`${url} was checked < 30 minutes ago, skipping...`)
+      //   return;
+      // }
+      // if (((+new Date() - +entry.start) >= 2_592_000_000)) { // if it's been tracked for more than a month abort
+      //   console.log("tracked for more than a month, stopping...")
+      // }
 
-    if (!await checkPath(storePath)) {
-      await mkdir(storePath, { recursive: true })
-    };
+      // if the last update was more than a month ago...
+      if (((+new Date() - +entry.lastUpdate) >= 2_592_000_000)) {
+        console.log(`Last update for ${Url} was > a month ago, removing from archival scanner...`)
+        await this.db("ARticle").where("url", "=", Url).delete()
+      }
 
-    const [siteData, resolvedUrl] = await pageArchiver(url)
 
-    const indexPresent = await checkPath(indexPath)
-    let cachedData;
-    if ((!indexPresent) || entry.updates % 5 === 0) {
-      // re-calibrate difference if it's the "5nth" update
-      // perform another query to get the average difference between pages regardless of critical content change.
-      let [siteData2, _] = await pageArchiver(url);
-      entry.normalisedDiff = await compareTwoStrings(siteData, siteData2)
-      siteData2 = ""; //wipe it
-      // console.log(`normDiff: ${entry.normalisedDiff}`)
-      await writeFile(indexPath, siteData)
-      cachedData = siteData
-    }
-    if (indexPresent) {
-      cachedData = await readFile(indexPath, { encoding: "utf8" })
-    }
+      const [siteData, resolvedUrl] = await pageArchiver(Url)
 
-    const diffVal = await compareTwoStrings(siteData, cachedData);
-    let relativeDiff = Math.abs(diffVal - entry.normalisedDiff)
+      if (Url != resolvedUrl) {
+        // check if another entry with this resolved URL exists.
+        if (!await this.db("ARticle").select(["url"]).where('url', '=', Url)) {
+          // remove this entry in favour of the existing one.
+          await this.db("ARticle").where("url", "=", Url).delete()
+          return;
+          //   await this.db("ARticle").update("url", resolvedUrl).where("url", "=", Url) //.onConflict("*").ignore()
+          //   const newHash = crypto.createHash('sha256').update(resolvedUrl).digest('hex');
+          //   if (await checkPath(indexPath)) {
+          //     await promises.rename(indexPath, `${storePath}/${newHash}.html`)
+          //   }
+          // }
+          // indexPath = `${storePath}/${newHash}.html`
+          // 
+        } else {
+          await this.db("ARticle").update("url", resolvedUrl).where("url", "=", Url)
+        }
+      }
 
-    // console.log(`relDiff: ${relativeDiff}`);
-    if (relativeDiff < this.diff) { // must be at least 2% different 
-      console.log(`${url} was not different enough from saved copy (${relativeDiff}).. assuming no changes.`)
-      return "not different enough"
-    } else {
-      console.log(`Update detected for ${url} - RD: ${relativeDiff}`)
+      Url = resolvedUrl
+
+      // get storage hash ID
+      const storeHash = crypto.createHash('sha256').update(Url).digest('hex');
+      console.log(`URL:SH ${Url} : ${storeHash}`)
+      const storePath = "./sites" // TODO: configurable
+      let indexPath = `${storePath}/${storeHash}.html`
+
+      if (!await checkPath(storePath)) {
+        await mkdir(storePath, { recursive: true })
+      };
+
+      const indexPresent = await checkPath(indexPath)
+      let cachedData;
+      if ((!indexPresent) || entry.updates % 5 === 0) {
+        // re-calibrate difference if it's the "5th" update
+        // perform another query to get the average difference between pages regardless of critical content change.
+        let [siteData2, _] = await pageArchiver(Url);
+        entry.normalisedDiff = await compareTwoStrings(siteData, siteData2)
+        siteData2 = ""; //wipe it
+        // console.log(`normDiff: ${entry.normalisedDiff}`)
+        await writeFile(indexPath, siteData)
+        cachedData = siteData
+      }
+      if (indexPresent) {
+        cachedData = await readFile(indexPath, { encoding: "utf8" })
+      }
+
+      const diffVal = await compareTwoStrings(siteData, cachedData);
+      let relativeDiff = Math.abs(diffVal - entry.normalisedDiff)
+
+      // console.log(`relDiff: ${relativeDiff}`);
+
+      // if (relativeDiff < this.diff) { // must be at least 2% different 
+      //   console.log(`${Url} was not different enough from saved copy (${relativeDiff}).. assuming no changes.`)
+      //   return "not different enough"
+      // } else {
+
+      console.log(`Update detected for ${Url} - RD: ${relativeDiff}`)
       entry.updates++;
       //entry.lastCheck = new Date();
       await writeFile(indexPath, siteData)
 
-      const tags = [
+      let tags = [
         { name: "Application", value: "ARticle" },
-        { name: "Content-Type", value: "text/html" },
-        // { name: "News-API-Query", value: `${this.query}` },
         { name: "Key-Word-List", value: `${this.keywordListID}` },
-        { name: "URL", value: `${resolvedUrl}` }
+        { name: "Key-Word-List-Version", value: `${this.keywordListVersion ?? "unknown"}` },
+        { name: "URL", value: `${Url}` }
       ];
-      const tx = await this.bundlr.createTransaction(siteData, { tags })
-      await tx.sign();
-      await tx.upload()
-      console.log(`Uploaded ${url} to ${tx.id}`)
+
+
+      const manifest = {
+        manifest: "arweave/paths",
+        version: "0.1.0",
+        index: {},
+        paths: {}
+      }
+
+      const dataTx = this.bundlr.createTransaction(siteData, { tags: [...tags, { name: "Content-Type", value: "text/html" }] })
+      await dataTx.sign()
+      const dataTxRes = await dataTx.upload()
+
+      manifest.paths["index.html"] = { id: dataTxRes.data.id }
+      manifest.index = { path: "index.html" }
+
+
+      const { tags: nftTags, initState } = await this.pool.getNftData((await getNextNFTId()).toString(), this.config.pool.transferable ?? false)
+      tags = tags.concat(nftTags)
+      tags.push({ name: "Type", value: "manifest" })
+
+
+      const txRes = await this.warp.createContract.deployFromSourceTx({
+        srcTxId: this.pool.nftContractSrc,
+        wallet: this.keys.arweave,
+        initState: JSON.stringify(initState),
+        data: { "Content-Type": "application/x.arweave-manifest+json", body: JSON.stringify(manifest) },
+        tags
+      }, true)
+
+      // const tx = this.bundlr.createTransaction(siteData, { tags })
+      // await tx.sign()
+      // const txRes = await tx.upload()
+
+      console.log(`Uploaded ${Url} to ${txRes}`)
+      // }
+      await this.db("ARticle").where('url', '=', Url).update({ updates: entry.updates, lastCheck: new Date().toISOString().slice(0, 19).replace('T', ' '), normalisedDiff: entry.normalisedDiff })
+      return "done";
+    } catch (err) {
+      console.log(`Error processing URL ${url} - ${JSON.stringify(err)}`)
     }
-    await this.db("ARticle").where('url', '=', url).update({ updates: entry.updates, lastCheck: new Date().toISOString().slice(0, 19).replace('T', ' '), normalisedDiff: entry.normalisedDiff })
-    return "done";
   }
 
   public async addUrl(url) {
     await this.db("ARticle").insert({ url }).onConflict("url").ignore()
+  }
+
+  private async getNextArtefactId(): Promise<number> {
+    let id = ++this.id
+    await writeFile("./.idcache", id.toString())
+    return id
   }
 
   public async updateNewsApi(customDate = new Date()) {
@@ -213,6 +321,7 @@ export default class ARticle {
 
     console.log(`Processing...`)
     const urls = source.call()
+    console.log((await this.db("ARticle").count("*").first())["count(*)"], "many URLS")
     const pool = new AsyncIterPromisePool(urls, this.processURL.bind(this), this.instances, preprocessor)
     await pool.startProcessing();
   }

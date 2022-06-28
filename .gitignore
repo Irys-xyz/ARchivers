@@ -11,3 +11,5 @@ ARchiver.db-wal
 config.json
 .devcontainer/
 test.ts
+idcache
+.idcachelock
