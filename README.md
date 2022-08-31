@@ -2,14 +2,9 @@
 To run either TwittAR or ARticle, you need an Arweave wallet - more specifically an Arweave wallet file.
 You need to copy the contents of this wallet file into the example (example.wallet.json) wallets' "arweave" section.
 
-You also need to have docker and a set of build tools installed (for not LTS node versions).  
+This assumes you're running Chromium on port 3000
 
 Run `yarn` to install dependencies.
-
-Docker command to create headless chrome host:
-`docker run --shm-size=4096m -e KEEP_ALIVE=true -e MAX_CONCURRENT_SESSIONS=60 -e MAX_QUEUE_LENGTH=400 -e CONNECTION_TIMEOUT=180000 -p 3000:3000 --restart always -d --name bc browserless/chrome`
-
-Tweak the `MAX_CONCURRENT_SESSIONS` value as required - higher = more load but a higher chance of content being archived (download requests are dropped if the queue gets too full).
 
 # TwittAR
 To run TwittAR you need Twitter API keys, which you can get via a Twitter developer account.
@@ -44,3 +39,9 @@ Start the project (TwittAR and ARticle):
  
 `pm2 start ARchiver.ecosystem.config.js`  
 
+# Running Chromium with Docker
+
+Docker command to create headless chrome host:
+`docker run --shm-size=4096m -e KEEP_ALIVE=true -e MAX_CONCURRENT_SESSIONS=60 -e MAX_QUEUE_LENGTH=400 -e CONNECTION_TIMEOUT=180000 -p 3000:3000 --restart always -d --name bc browserless/chrome`
+
+Tweak the `MAX_CONCURRENT_SESSIONS` value as required - higher = more load but a higher chance of content being archived (download requests are dropped if the queue gets too full).
